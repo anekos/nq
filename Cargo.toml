@@ -13,6 +13,10 @@ name = "nq"
 doc = false
 
 [dependencies]
-quick-csv = "*"
 encoding = "*"
+mktemp = "*"
+quick-csv = "*"
 rusqlite = "*"
+serde = "1.0"
+serde_derive = "1.0"
+docopt = "*"
