@@ -5,6 +5,7 @@ dependencies = [
  "docopt 0.8.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "encoding 0.2.33 (registry+https://github.com/rust-lang/crates.io-index)",
  "quick-csv 0.1.6 (registry+https://github.com/rust-lang/crates.io-index)",
+ "regex 0.2.3 (registry+https://github.com/rust-lang/crates.io-index)",
  "rusqlite 0.13.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "serde 1.0.24 (registry+https://github.com/rust-lang/crates.io-index)",
  "serde_derive 1.0.24 (registry+https://github.com/rust-lang/crates.io-index)",

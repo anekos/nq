@@ -3,6 +3,7 @@
 extern crate docopt;
 extern crate encoding;
 extern crate quick_csv;
+extern crate regex;
 extern crate rusqlite;
 
 
@@ -17,10 +18,17 @@ use docopt::Docopt;
 use encoding::DecoderTrap;
 use encoding::label::encoding_from_whatwg_label;
 use quick_csv::Csv;
+use regex::Regex;
 use rusqlite::types::ToSql;
 use rusqlite::{Connection, Transaction};
 
 
+#[derive(Eq, PartialEq, Clone, Debug)]
+enum Type {
+    Int = 2,
+    Real = 1,
+    Text = 0
+}
 
 const USAGE: &'static str = "
 not q
@@ -34,6 +42,7 @@ Options:
   -e ENCODING   CSV character encoding: https://encoding.spec.whatwg.org/#concept-encoding-get
   -q SQL        SQL
   -c CACHE      Cache *.sqlite
+  -g LINES      The number of rows for guess column types (defualt: 42)
   -h --help     Show this screen.
   --version     Show version.
 ";
@@ -45,6 +54,7 @@ struct AppOptions {
     flag_c: Option<String>,
     flag_q: Option<String>,
     flag_e: Option<String>,
+    flag_g: Option<usize>,
     arg_sqlite_options: Vec<String>,
 }
 
@@ -64,16 +74,25 @@ fn nq() -> Result<(), Box<Error>> {
     let cache_is_fresh = is_fresh(&options.arg_csv, &cache_filepath)?;
 
     if !cache_is_fresh {
-        let mut buffer = String::new();
-        let mut csv = open_csv(&options.arg_csv, &mut buffer, &options.flag_e)?;
+        let csv_text = read_file(&options.arg_csv, &options.flag_e)?;
+        let mut csv = quick_csv::Csv::from_string(&csv_text);
 
         let header = csv.next().ok_or("Header not found")??;
         let header = header.columns()?.collect::<Vec<&str>>();
 
+        let mut types: Vec<Type> = vec![];
+        types.resize(header.len(), Type::Int);
+
+        if let Some(lines) = options.flag_g {
+            let mut csv = quick_csv::Csv::from_string(&csv_text);
+            csv.next().ok_or("No header")??;
+            guess_types(&mut types, lines, csv)?
+        }
+
         let mut conn = Connection::open(&cache_filepath)?;
         let tx = conn.transaction()?;
 
-        create_table(&tx, header.as_slice())?;
+        create_table(&tx, &types, header.as_slice())?;
         insert_rows(&tx, header.len(), csv)?;
 
         tx.commit()?;
@@ -96,21 +115,23 @@ fn make_sqlite(sqlite_filepath: &str, cache_filepath: &Option<String>) -> Result
     }
 }
 
-fn open_csv<'a>(csv_filepath: &str, buffer: &'a mut String, encoding: &Option<String>) -> Result<Csv<&'a [u8]>, Box<Error>> {
+fn read_file(csv_filepath: &str, encoding: &Option<String>) -> Result<String, Box<Error>> {
+    let mut buffer = String::new();
     let mut file = File::open(csv_filepath)?;
 
     if let Some(ref encoding) = *encoding {
         let encoding = encoding_from_whatwg_label(encoding).ok_or("Invalid encoding name")?;
         let mut bin: Vec<u8> = vec![];
         file.read_to_end(&mut bin)?;
-        *buffer = match encoding.decode(&bin, DecoderTrap::Replace) {
+        buffer = match encoding.decode(&bin, DecoderTrap::Replace) {
             Ok(s) => s,
             Err(s) => s.to_string(),
         };
     } else {
-        file.read_to_string(buffer)?;
+        file.read_to_string(&mut buffer)?;
     }
-    Ok(quick_csv::Csv::from_string(buffer))
+
+    Ok(buffer)
 }
 
 fn is_fresh(csv_filepath: &str, sqlite_filepath: &str) -> Result<bool, Box<Error>> {
@@ -122,21 +143,51 @@ fn is_fresh(csv_filepath: &str, sqlite_filepath: &str) -> Result<bool, Box<Error
     Ok(csv < sqlite)
 }
 
-fn create_table(tx: &Transaction, header: &[&str]) -> Result<(), Box<Error>> {
-    let mut create = "CREATE TABLE rows (".to_owned();
+fn guess_types(types: &mut Vec<Type>, lines: usize, rows: Csv<&[u8]>) -> Result<(), Box<Error>> {
+    if 0 == lines {
+        return Ok(());
+    }
+
+    let int = Regex::new("^[-+]?\\d{1,18}$")?;
+    let real = Regex::new("^[-+]?\\d+\\.\\d+$")?;
+
+    for row in rows.into_iter().take(lines) {
+        let row = row?;
+        let columns: Vec<&str> = row.columns()?.collect();
+        for (lv, column) in columns.iter().enumerate() {
+            let types = &mut types[lv];
+            if *types == Type::Int && !int.is_match(column) {
+                *types = Type::Real;
+            }
+            if *types == Type::Real && !real.is_match(column) {
+                *types = Type::Text;
+            }
+        }
+    }
+
+    Ok(())
+}
+
+fn create_table(tx: &Transaction, types: &[Type], header: &[&str]) -> Result<(), Box<Error>> {
+    let mut create = "CREATE TABLE n (".to_owned();
     let mut first = true;
-    for name in header {
+    for (i, name) in header.iter().enumerate() {
         let name = name.replace("'", "''");
         if first {
             first = false;
         } else {
             create.push(',');
         }
-        create.push_str(&format!("'{}' text", name));
+        let t = match types[i] {
+            Type::Int => "integer",
+            Type::Real => "real",
+            Type::Text => "text",
+        };
+        create.push_str(&format!("'{}' {}", name, t));
     }
     create.push(')');
 
-    tx.execute("DROP TABLE IF EXISTS rows", &[]).unwrap();
+    tx.execute("DROP TABLE IF EXISTS n", &[]).unwrap();
     tx.execute(&create, &[])?;
 
     Ok(())
@@ -144,7 +195,7 @@ fn create_table(tx: &Transaction, header: &[&str]) -> Result<(), Box<Error>> {
 
 fn insert_rows(tx: &Transaction, headers: usize, rows: Csv<&[u8]>) -> Result<(), Box<Error>> {
     let insert = {
-        let mut insert = "INSERT INTO rows VALUES(".to_owned();
+        let mut insert = "INSERT INTO n VALUES(".to_owned();
         let mut first = true;
         for _ in 0..headers {
             if first {
