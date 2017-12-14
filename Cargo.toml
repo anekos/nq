@@ -1,0 +1,18 @@
+[package]
+name = "nq"
+version = "0.1.0"
+authors = ["anekos <anekos@snca.net>"]
+repository = "https://github.com/anekos/nq"
+keywords = []
+license-file = "LICENSE"
+readme = "README.md"
+description = "nq"
+
+[[bin]]
+name = "nq"
+doc = false
+
+[dependencies]
+quick-csv = "*"
+encoding = "*"
+rusqlite = "*"
