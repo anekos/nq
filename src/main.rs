@@ -41,9 +41,10 @@ Usage:
 
 Options:
   -c CACHE      Cache *.sqlite
+  -d DELIMITER  Format: Delimter for csv
   -e ENCODING   CSV character encoding: https://encoding.spec.whatwg.org/#concept-encoding-get
   -g LINES      The number of rows for guess column types (defualt: 42)
-  -l            LTSV
+  -l            Format: LTSV
   -q SQL        SQL
   -r            Force refresh cache
   -h --help     Show this screen.
@@ -55,6 +56,7 @@ Options:
 struct AppOptions {
     arg_csv: String,
     flag_c: Option<String>,
+    flag_d: Option<char>,
     flag_e: Option<String>,
     flag_g: Option<usize>,
     flag_l: bool,
@@ -91,16 +93,13 @@ fn nq() -> Result<(), Box<Error>> {
             create_table(&tx, &types, header.as_slice())?;
             insert_ltsv_rows(&tx, &csv_text)?;
         } else {
-            let mut csv = quick_csv::Csv::from_string(&csv_text);
-
+            let mut csv = open_csv(&csv_text, &options.flag_d)?;
             let header = csv.next().ok_or("Header not found")??;
             let header = header.columns()?.collect::<Vec<&str>>();
-
             let mut types: Vec<Type> = vec![];
             types.resize(header.len(), Type::Int);
-
             if let Some(lines) = options.flag_g {
-                let mut csv = quick_csv::Csv::from_string(&csv_text);
+                let mut csv = open_csv(&csv_text, &options.flag_d)?;
                 csv.next().ok_or("No header")??;
                 guess_types(&mut types, lines, csv)?
             }
@@ -146,6 +145,14 @@ fn read_file(csv_filepath: &str, encoding: &Option<String>) -> Result<String, Bo
     }
 
     Ok(buffer)
+}
+
+fn open_csv<'a>(csv_text: &'a str, delimiter: &Option<char>) -> Result<Csv<&'a [u8]>, Box<Error>> {
+    let mut csv = quick_csv::Csv::from_string(&csv_text);
+    if let Some(delimiter) = *delimiter {
+        csv = csv.delimiter(delimiter as u8);
+    }
+    Ok(csv)
 }
 
 fn is_fresh(csv_filepath: &str, sqlite_filepath: &str) -> Result<bool, Box<Error>> {
@@ -227,18 +234,13 @@ fn insert_csv_rows(tx: &Transaction, headers: usize, rows: Csv<&[u8]>) -> Result
     let mut n = 0;
     for row in rows {
         n += 1;
-        if n % 100 == 0 {
-            eprintln!("{} rows", n);
-        }
-        if let Ok(row) = row {
-            let row: Vec<&str> = row.columns()?.collect();
-            let row: Vec<&ToSql> = row.iter().map(|it| it as &ToSql).collect();
-            stmt.execute(row.as_slice())?;
-        }
+        progress(n, false);
+        let row = row?;
+        let row: Vec<&str> = row.columns()?.collect();
+        let row: Vec<&ToSql> = row.iter().map(|it| it as &ToSql).collect();
+        stmt.execute(row.as_slice())?;
     }
-    if n % 100 != 0 {
-        eprintln!("{} rows", n);
-    }
+    progress(n, true);
 
     Ok(())
 }
@@ -264,7 +266,12 @@ fn ltsv_header(content: &str) -> Result<Vec<&str>, Box<Error>> {
 }
 
 fn insert_ltsv_rows(tx: &Transaction, content: &str) -> Result<(), Box<Error>> {
+    let mut n = 0;
+
     for row in content.lines() {
+        n += 1;
+        progress(n, false);
+
         let mut names = String::new();
         let mut values = String::new();
         let mut args = Vec::<&str>::new();
@@ -288,12 +295,14 @@ fn insert_ltsv_rows(tx: &Transaction, content: &str) -> Result<(), Box<Error>> {
 
                 args.push(value);
             }
-
-            let q = format!("INSERT INTO n ({}) VALUES ({})", names, values);
-            let args: Vec<&ToSql> = args.iter().map(|it| it as &ToSql).collect();
-            tx.execute(&q, &args)?;
         }
+
+        let q = format!("INSERT INTO n ({}) VALUES ({})", names, values);
+        let args: Vec<&ToSql> = args.iter().map(|it| it as &ToSql).collect();
+        tx.execute(&q, &args)?;
     }
+
+    progress(n, true);
 
     Ok(())
 }
@@ -308,3 +317,9 @@ fn exec_sqlite(sqlite_filepath: &str, query: &Option<String>, options: &[String]
     cmd.exec();
 }
 
+fn progress(n: usize, last: bool) {
+    let just = n % 100 == 0;
+    if last ^ just {
+        eprintln!("{} rows", n);
+    }
+}
