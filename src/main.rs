@@ -148,7 +148,7 @@ fn read_file(csv_filepath: &str, encoding: &Option<String>) -> Result<String, Bo
 }
 
 fn open_csv<'a>(csv_text: &'a str, delimiter: &Option<char>) -> Result<Csv<&'a [u8]>, Box<Error>> {
-    let mut csv = quick_csv::Csv::from_string(&csv_text);
+    let mut csv = quick_csv::Csv::from_string(csv_text);
     if let Some(delimiter) = *delimiter {
         csv = csv.delimiter(delimiter as u8);
     }
