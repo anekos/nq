@@ -7,6 +7,7 @@ extern crate regex;
 extern crate rusqlite;
 
 
+use std::collections::HashSet;
 use std::error::Error;
 use std::fs::{File, metadata};
 use std::io::Read;
@@ -43,6 +44,7 @@ Options:
   -q SQL        SQL
   -c CACHE      Cache *.sqlite
   -g LINES      The number of rows for guess column types (defualt: 42)
+  -l            LTSV
   -r            Force refresh cache
   -h --help     Show this screen.
   --version     Show version.
@@ -55,6 +57,7 @@ struct AppOptions {
     flag_c: Option<String>,
     flag_e: Option<String>,
     flag_g: Option<usize>,
+    flag_l: bool,
     flag_q: Option<String>,
     flag_r: bool,
     arg_sqlite_options: Vec<String>,
@@ -77,25 +80,34 @@ fn nq() -> Result<(), Box<Error>> {
 
     if !cache_is_fresh {
         let csv_text = read_file(&options.arg_csv, &options.flag_e)?;
-        let mut csv = quick_csv::Csv::from_string(&csv_text);
-
-        let header = csv.next().ok_or("Header not found")??;
-        let header = header.columns()?.collect::<Vec<&str>>();
-
-        let mut types: Vec<Type> = vec![];
-        types.resize(header.len(), Type::Int);
-
-        if let Some(lines) = options.flag_g {
-            let mut csv = quick_csv::Csv::from_string(&csv_text);
-            csv.next().ok_or("No header")??;
-            guess_types(&mut types, lines, csv)?
-        }
 
         let mut conn = Connection::open(&cache_filepath)?;
         let tx = conn.transaction()?;
 
-        create_table(&tx, &types, header.as_slice())?;
-        insert_rows(&tx, header.len(), csv)?;
+        if options.flag_l {
+            let header = ltsv_header(&csv_text)?;
+            let mut types: Vec<Type> = vec![];
+            types.resize(header.len(), Type::Text);
+            create_table(&tx, &types, header.as_slice())?;
+            insert_ltsv_rows(&tx, &csv_text)?;
+        } else {
+            let mut csv = quick_csv::Csv::from_string(&csv_text);
+
+            let header = csv.next().ok_or("Header not found")??;
+            let header = header.columns()?.collect::<Vec<&str>>();
+
+            let mut types: Vec<Type> = vec![];
+            types.resize(header.len(), Type::Int);
+
+            if let Some(lines) = options.flag_g {
+                let mut csv = quick_csv::Csv::from_string(&csv_text);
+                csv.next().ok_or("No header")??;
+                guess_types(&mut types, lines, csv)?
+            }
+
+            create_table(&tx, &types, header.as_slice())?;
+            insert_csv_rows(&tx, header.len(), csv)?;
+        }
 
         tx.commit()?;
     }
@@ -195,7 +207,7 @@ fn create_table(tx: &Transaction, types: &[Type], header: &[&str]) -> Result<(),
     Ok(())
 }
 
-fn insert_rows(tx: &Transaction, headers: usize, rows: Csv<&[u8]>) -> Result<(), Box<Error>> {
+fn insert_csv_rows(tx: &Transaction, headers: usize, rows: Csv<&[u8]>) -> Result<(), Box<Error>> {
     let insert = {
         let mut insert = "INSERT INTO n VALUES(".to_owned();
         let mut first = true;
@@ -231,6 +243,61 @@ fn insert_rows(tx: &Transaction, headers: usize, rows: Csv<&[u8]>) -> Result<(),
     Ok(())
 }
 
+fn ltsv_header(content: &str) -> Result<Vec<&str>, Box<Error>> {
+    let mut names = HashSet::<&str>::new();
+
+    for row in content.lines() {
+        for column in row.split('\t') {
+            if let Some(idx) = column.find(':') {
+                if idx == 0 {
+                    continue;
+                }
+                let (name, _) = column.split_at(idx);
+                if !names.contains(name) {
+                    names.insert(name);
+                }
+            }
+        }
+    }
+
+    Ok(names.into_iter().collect())
+}
+
+fn insert_ltsv_rows(tx: &Transaction, content: &str) -> Result<(), Box<Error>> {
+    for row in content.lines() {
+        let mut names = String::new();
+        let mut values = String::new();
+        let mut args = Vec::<&str>::new();
+
+        for (index, column) in row.split('\t').enumerate() {
+            if let Some(idx) = column.find(':') {
+                if idx == 0 && column.len() <= 1{
+                    continue;
+                }
+                let (name, value) = column.split_at(idx);
+                let value = &value[1..];
+
+                if 0 < index {
+                    names.push(',');
+                    values.push(',');
+                }
+
+                let name = name.replace("'", "''");
+                names.push_str(&format!("'{}'", name));
+                values.push('?');
+
+                args.push(value);
+            }
+
+            let q = format!("INSERT INTO n ({}) VALUES ({})", names, values);
+            let args: Vec<&ToSql> = args.iter().map(|it| it as &ToSql).collect();
+            tx.execute(&q, &args)?;
+        }
+    }
+
+    Ok(())
+}
+
 fn exec_sqlite(sqlite_filepath: &str, query: &Option<String>, options: &[String]) {
     let mut cmd = Command::new("sqlite3");
     cmd.arg(sqlite_filepath);
@@ -240,3 +307,4 @@ fn exec_sqlite(sqlite_filepath: &str, query: &Option<String>, options: &[String]
     }
     cmd.exec();
 }
+
