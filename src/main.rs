@@ -43,6 +43,7 @@ Options:
   -q SQL        SQL
   -c CACHE      Cache *.sqlite
   -g LINES      The number of rows for guess column types (defualt: 42)
+  -r            Force refresh cache
   -h --help     Show this screen.
   --version     Show version.
 ";
@@ -52,9 +53,10 @@ Options:
 struct AppOptions {
     arg_csv: String,
     flag_c: Option<String>,
-    flag_q: Option<String>,
     flag_e: Option<String>,
     flag_g: Option<usize>,
+    flag_q: Option<String>,
+    flag_r: bool,
     arg_sqlite_options: Vec<String>,
 }
 
@@ -71,7 +73,7 @@ fn nq() -> Result<(), Box<Error>> {
     let options: AppOptions = Docopt::new(USAGE).and_then(|d| d.deserialize()).unwrap_or_else(|e| e.exit());
 
     let cache_filepath = make_sqlite(&options.arg_csv, &options.flag_c)?;
-    let cache_is_fresh = is_fresh(&options.arg_csv, &cache_filepath)?;
+    let cache_is_fresh = !options.flag_r && is_fresh(&options.arg_csv, &cache_filepath)?;
 
     if !cache_is_fresh {
         let csv_text = read_file(&options.arg_csv, &options.flag_e)?;
