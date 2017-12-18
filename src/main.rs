@@ -40,11 +40,11 @@ Usage:
   nq --version
 
 Options:
-  -e ENCODING   CSV character encoding: https://encoding.spec.whatwg.org/#concept-encoding-get
-  -q SQL        SQL
   -c CACHE      Cache *.sqlite
+  -e ENCODING   CSV character encoding: https://encoding.spec.whatwg.org/#concept-encoding-get
   -g LINES      The number of rows for guess column types (defualt: 42)
   -l            LTSV
+  -q SQL        SQL
   -r            Force refresh cache
   -h --help     Show this screen.
   --version     Show version.
