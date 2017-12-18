@@ -117,11 +117,11 @@ fn nq() -> Result<(), Box<Error>> {
 }
 
 
-fn make_sqlite(sqlite_filepath: &str, cache_filepath: &Option<String>) -> Result <String, Box<Error>> {
+fn make_sqlite(csv_filepath: &str, cache_filepath: &Option<String>) -> Result <String, Box<Error>> {
     match *cache_filepath {
         Some(ref path) => Ok(path.clone()),
         None => {
-            let mut path = sqlite_filepath.to_owned();
+            let mut path = csv_filepath.to_owned();
             path.push_str(".nq-cache.sqlite");
             Ok(path)
         }
