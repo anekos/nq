@@ -2,6 +2,7 @@
 #[macro_use] extern crate serde_derive;
 extern crate docopt;
 extern crate encoding;
+extern crate mktemp;
 extern crate quick_csv;
 extern crate regex;
 extern crate rusqlite;
@@ -10,7 +11,7 @@ extern crate rusqlite;
 use std::collections::HashSet;
 use std::error::Error;
 use std::fs::{File, metadata};
-use std::io::Read;
+use std::io::{self, Read};
 use std::os::unix::process::CommandExt;
 use std::path::Path;
 use std::process::{exit, Command};
@@ -65,6 +66,16 @@ struct AppOptions {
     arg_sqlite_options: Vec<String>,
 }
 
+enum Input<'a> {
+    File(&'a str),
+    Stdin,
+}
+
+enum Cache {
+    File(String),
+    Temp(mktemp::Temp),
+}
+
 
 fn main() {
     if let Err(err) = nq() {
@@ -77,13 +88,14 @@ fn main() {
 fn nq() -> Result<(), Box<Error>> {
     let options: AppOptions = Docopt::new(USAGE).and_then(|d| d.deserialize()).unwrap_or_else(|e| e.exit());
 
-    let cache_filepath = make_sqlite(&options.arg_csv, &options.flag_c)?;
-    let cache_is_fresh = !options.flag_R && is_fresh(&options.arg_csv, &cache_filepath)?;
+    let input = parse_input(&options.arg_csv);
+    let cache = make_sqlite(&input, &options.flag_c)?;
+    let cache_is_fresh = !options.flag_R && is_fresh(&input, &cache)?;
 
     if !cache_is_fresh {
-        let csv_text = read_file(&options.arg_csv, &options.flag_e)?;
+        let csv_text = read_file(&input, &options.flag_e)?;
 
-        let mut conn = Connection::open(&cache_filepath)?;
+        let mut conn = Connection::open(&cache)?;
         let tx = conn.transaction()?;
 
         if options.flag_l {
@@ -111,37 +123,64 @@ fn nq() -> Result<(), Box<Error>> {
         tx.commit()?;
     }
 
-    exec_sqlite(&cache_filepath, &options.flag_q, &options.arg_sqlite_options);
+    exec_sqlite(&cache, &options.flag_q, &options.arg_sqlite_options);
 
     Ok(())
 }
 
+fn parse_input<'a>(filepath: &'a str) -> Input<'a> {
+    match filepath {
+        "-" => Input::Stdin,
+        _ => Input::File(filepath)
+    }
+}
 
-fn make_sqlite(csv_filepath: &str, cache_filepath: &Option<String>) -> Result <String, Box<Error>> {
-    match *cache_filepath {
-        Some(ref path) => Ok(path.clone()),
-        None => {
-            let mut path = csv_filepath.to_owned();
-            path.push_str(".nq-cache.sqlite");
-            Ok(path)
+
+fn make_sqlite(input: &Input, cache_filepath: &Option<String>) -> Result <Cache, Box<Error>> {
+    match *input {
+        Input::Stdin => Ok(Cache::Temp(mktemp::Temp::new_file()?)),
+        Input::File(ref input_path) => {
+            match *cache_filepath {
+                Some(ref path) => Ok(Cache::File(path.clone())),
+                None => {
+                    let mut path = input_path.to_string();
+                    path.push_str(".nq-cache.sqlite");
+                    Ok(Cache::File(path))
+                }
+            }
         }
     }
 }
 
-fn read_file(csv_filepath: &str, encoding: &Option<String>) -> Result<String, Box<Error>> {
+fn read_file(input: &Input, encoding: &Option<String>) -> Result<String, Box<Error>> {
     let mut buffer = String::new();
-    let mut file = File::open(csv_filepath)?;
 
     if let Some(ref encoding) = *encoding {
         let encoding = encoding_from_whatwg_label(encoding).ok_or("Invalid encoding name")?;
         let mut bin: Vec<u8> = vec![];
-        file.read_to_end(&mut bin)?;
+        match *input {
+            Input::File(ref input_filepath) => {
+                let mut file = File::open(input_filepath)?;
+                file.read_to_end(&mut bin)?;
+            },
+            Input::Stdin => {
+                io::stdin().read_to_end(&mut bin)?;
+            }
+        }
         buffer = match encoding.decode(&bin, DecoderTrap::Replace) {
             Ok(s) => s,
             Err(s) => s.to_string(),
         };
     } else {
-        file.read_to_string(&mut buffer)?;
+        match *input {
+            Input::File(input_filepath) => {
+                let mut file = File::open(input_filepath)?;
+                file.read_to_string(&mut buffer)?;
+            },
+            Input::Stdin => {
+                io::stdin().read_to_string(&mut buffer)?;
+            }
+        }
     }
 
     Ok(buffer)
@@ -155,13 +194,23 @@ fn open_csv<'a>(csv_text: &'a str, delimiter: &Option<char>) -> Result<Csv<&'a [
     Ok(csv)
 }
 
-fn is_fresh(csv_filepath: &str, sqlite_filepath: &str) -> Result<bool, Box<Error>> {
-    if !Path::new(sqlite_filepath).exists() {
-        return Ok(false)
+fn is_fresh(input: &Input, cache: &Cache) -> Result<bool, Box<Error>> {
+    match *input {
+        Input::Stdin => Ok(false),
+        Input::File(input_filepath) => {
+            match *cache {
+                Cache::File(ref cache_filepath) => {
+                    if !Path::new(cache_filepath).exists() {
+                        return Ok(false)
+                    }
+                    let input = metadata(input_filepath)?.modified()?;
+                    let cache = metadata(cache_filepath)?.modified()?;
+                    Ok(input < cache)
+                },
+                _ => panic!("Not implemented"),
+            }
+        }
     }
-    let csv = metadata(csv_filepath)?.modified()?;
-    let sqlite = metadata(sqlite_filepath)?.modified()?;
-    Ok(csv < sqlite)
 }
 
 fn guess_types(types: &mut Vec<Type>, lines: usize, rows: Csv<&[u8]>) -> Result<(), Box<Error>> {
@@ -307,9 +356,9 @@ fn insert_ltsv_rows(tx: &Transaction, content: &str) -> Result<(), Box<Error>> {
     Ok(())
 }
 
-fn exec_sqlite(sqlite_filepath: &str, query: &Option<String>, options: &[String]) {
+fn exec_sqlite(cache: &Cache, query: &Option<String>, options: &[String]) {
     let mut cmd = Command::new("sqlite3");
-    cmd.arg(sqlite_filepath);
+    cmd.arg(cache.as_ref());
     cmd.args(options);
     if let Some(ref query) = *query {
         cmd.arg(query);
@@ -321,5 +370,15 @@ fn progress(n: usize, last: bool) {
     let just = n % 100 == 0;
     if last ^ just {
         eprintln!("{} rows", n);
+    }
+}
+
+
+impl AsRef<Path> for Cache {
+    fn as_ref(&self) -> &Path {
+        match *self {
+            Cache::File(ref path) => Path::new(path),
+            Cache::Temp(ref path) => path.as_ref(),
+        }
     }
 }
