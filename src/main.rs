@@ -10,6 +10,7 @@ extern crate rusqlite;
 
 use std::env;
 use std::error::Error;
+use std::fs;
 use std::os::unix::process::CommandExt;
 use std::process::{exit, Command};
 
@@ -68,9 +69,14 @@ fn make_sqlite(input: &Input, cache_filepath: &Option<String>) -> Result <Cache,
             match *cache_filepath {
                 Some(ref path) => Ok(Cache::File(path.clone())),
                 None => {
-                    let mut path = input_path.to_string();
-                    path.push_str(".nq-cache.sqlite");
-                    Ok(Cache::File(path))
+                    let meta = fs::File::open(input_path)?.metadata()?;
+                    if meta.is_file() {
+                        let mut path = input_path.to_string();
+                        path.push_str(".nq-cache.sqlite");
+                        Ok(Cache::File(path))
+                    } else {
+                        Ok(Cache::Temp(mktemp::Temp::new_file()?))
+                    }
                 }
             }
         }
