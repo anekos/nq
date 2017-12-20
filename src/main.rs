@@ -2,6 +2,8 @@
 #[macro_use] extern crate serde_derive;
 extern crate docopt;
 extern crate encoding;
+extern crate json;
+extern crate json_reader;
 extern crate mktemp;
 extern crate quick_csv;
 extern crate regex;
@@ -14,9 +16,10 @@ use std::process::{exit, Command};
 
 mod app_options;
 mod cache;
-mod csv;
-mod json;
-mod ltsv;
+mod format_csv;
+mod format_json;
+mod format_ltsv;
+mod sql;
 mod types;
 mod ui;
 

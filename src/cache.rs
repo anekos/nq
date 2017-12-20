@@ -8,9 +8,9 @@ use encoding::DecoderTrap;
 use encoding::label::encoding_from_whatwg_label;
 use rusqlite::{Transaction, Connection};
 
-use csv;
-use json;
-use ltsv;
+use format_csv;
+use format_json;
+use format_ltsv;
 use types::*;
 
 
@@ -42,31 +42,32 @@ pub fn refresh(cache: &Cache, format: Format, input: &Input, guess_lines: Option
 
     match format {
         Format::Ltsv => {
-            let header = ltsv::header(&csv_text)?;
+            let header = format_ltsv::header(&csv_text)?;
             let types = Type::new(header.len());
             create_table(&tx, &types, header.as_slice())?;
-            ltsv::insert_rows(&tx, &csv_text)?;
+            format_ltsv::insert_rows(&tx, &csv_text)?;
         }
         Format::Json => {
-            let header = json::header(&csv_text)?;
+            let header = format_json::header(&csv_text)?;
+            let header: Vec<&str> = header.iter().map(|it| it.as_ref()).collect();
             let types = Type::new(header.len());
             create_table(&tx, &types, header.as_slice())?;
-            json::insert_rows(&tx, &csv_text)?;
+            format_json::insert_rows(&tx, &csv_text)?;
         }
         Format::Csv(delimiter) => {
-            let mut content = csv::open(&csv_text, delimiter)?;
+            let mut content = format_csv::open(&csv_text, delimiter)?;
             let header = content.next().ok_or("Header not found")??;
             let header = header.columns()?.collect::<Vec<&str>>();
             let mut types: Vec<Type> = vec![];
             types.resize(header.len(), Type::Int);
             if let Some(lines) = guess_lines {
-                let mut content = csv::open(&csv_text, delimiter)?;
+                let mut content = format_csv::open(&csv_text, delimiter)?;
                 content.next().ok_or("No header")??;
-                csv::guess_types(&mut types, lines, content)?
+                format_csv::guess_types(&mut types, lines, content)?
             }
 
             create_table(&tx, &types, header.as_slice())?;
-            csv::insert_rows(&tx, header.len(), content)?;
+            format_csv::insert_rows(&tx, header.len(), content)?;
         }
     }
 

@@ -5,7 +5,7 @@ use std::error::Error;
 use rusqlite::types::ToSql;
 use rusqlite:: Transaction;
 
-use ui::progress;
+use ui;
 
 
 
@@ -30,11 +30,10 @@ pub fn header(content: &str) -> Result<Vec<&str>, Box<Error>> {
 }
 
 pub fn insert_rows(tx: &Transaction, content: &str) -> Result<(), Box<Error>> {
-    let mut n = 0;
+    let mut p = ui::Progress::new();
 
     for row in content.lines() {
-        n += 1;
-        progress(n, false);
+        p.progress();
 
         let mut names = String::new();
         let mut values = String::new();
@@ -66,7 +65,7 @@ pub fn insert_rows(tx: &Transaction, content: &str) -> Result<(), Box<Error>> {
         tx.execute(&q, &args)?;
     }
 
-    progress(n, true);
+    p.complete();
 
     Ok(())
 }
