@@ -9,6 +9,7 @@ extern crate rusqlite;
 
 
 use std::collections::HashSet;
+use std::env;
 use std::error::Error;
 use std::fs::{File, metadata};
 use std::io::{self, Read};
@@ -357,7 +358,8 @@ fn insert_ltsv_rows(tx: &Transaction, content: &str) -> Result<(), Box<Error>> {
 }
 
 fn exec_sqlite(cache: &Cache, query: &Option<String>, options: &[String]) {
-    let mut cmd = Command::new("sqlite3");
+    let cmd = env::var("NQ_SQLITE").unwrap_or_else(|_| "sqlite3".to_owned());
+    let mut cmd = Command::new(cmd);
     cmd.arg(cache.as_ref());
     cmd.args(options);
     if let Some(ref query) = *query {
