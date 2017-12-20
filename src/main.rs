@@ -19,6 +19,7 @@ mod cache;
 mod format_csv;
 mod format_json;
 mod format_ltsv;
+mod format_simple;
 mod sql;
 mod types;
 mod ui;

@@ -11,6 +11,7 @@ use rusqlite::{Transaction, Connection};
 use format_csv;
 use format_json;
 use format_ltsv;
+use format_simple;
 use types::*;
 
 
@@ -53,6 +54,13 @@ pub fn refresh(cache: &Cache, format: Format, input: &Input, guess_lines: Option
             let types = Type::new(header.len());
             create_table(&tx, &types, header.as_slice())?;
             format_json::insert_rows(&tx, &csv_text)?;
+        }
+        Format::Simple => {
+            let reader = format_simple::Reader::new()?;
+            let header = reader.header(&csv_text)?;
+            let types = Type::new(header.len());
+            create_table(&tx, &types, header.as_slice())?;
+            reader.insert_rows(&tx, header.len(), &csv_text)?;
         }
         Format::Csv(delimiter) => {
             let mut content = format_csv::open(&csv_text, delimiter)?;

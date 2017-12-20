@@ -21,6 +21,7 @@ Options:
   -j            Format: JSON
   -l            Format: LTSV
   -q SQL        SQL
+  -s            Format: Simple (white spaces split text)
   -R            Force refresh cache
   -h --help     Show this screen.
   --version     Show version.
@@ -36,6 +37,7 @@ pub struct AppOptions {
     pub flag_j: bool,
     pub flag_l: bool,
     pub flag_q: Option<String>,
+    pub flag_s: bool,
     pub flag_R: bool,
     pub arg_sqlite_options: Vec<String>,
 }
@@ -50,6 +52,8 @@ impl AppOptions {
             Format::Ltsv
         } else if self.flag_j {
             Format::Json
+        } else if self.flag_s {
+            Format::Simple
         } else {
             Format::Csv(self.flag_d.map(|it| it as u8))
         }

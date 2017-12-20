@@ -17,6 +17,7 @@ pub enum Format {
     Csv(Option<u8>),
     Json,
     Ltsv,
+    Simple,
 }
 
 
