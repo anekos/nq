@@ -15,11 +15,10 @@ doc = false
 [dependencies]
 docopt = "*"
 encoding = "*"
-json = "*"
-json_reader = "*"
 mktemp = "*"
 quick-csv = "*"
 regex = "*"
 rusqlite = "*"
 serde = "1.0"
 serde_derive = "1.0"
+serde_json = "*"

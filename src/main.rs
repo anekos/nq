@@ -2,8 +2,7 @@
 #[macro_use] extern crate serde_derive;
 extern crate docopt;
 extern crate encoding;
-extern crate json;
-extern crate json_reader;
+extern crate serde_json;
 extern crate mktemp;
 extern crate quick_csv;
 extern crate regex;
