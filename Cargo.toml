@@ -15,6 +15,8 @@ doc = false
 [dependencies]
 docopt = "*"
 encoding = "*"
+json = "*"
+json_reader = "*"
 mktemp = "*"
 quick-csv = "*"
 regex = "*"

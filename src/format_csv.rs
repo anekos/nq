@@ -8,15 +8,15 @@ use regex::Regex;
 use rusqlite:: Transaction;
 use rusqlite::types::ToSql;
 
-use ui::progress;
+use ui;
 use types::*;
 
 
 
-pub fn open<'a>(csv_text: &'a str, delimiter: &Option<char>) -> Result<Csv<&'a [u8]>, Box<Error>> {
+pub fn open<'a>(csv_text: &'a str, delimiter: Option<u8>) -> Result<Csv<&'a [u8]>, Box<Error>> {
     let mut csv = quick_csv::Csv::from_string(csv_text);
-    if let Some(delimiter) = *delimiter {
-        csv = csv.delimiter(delimiter as u8);
+    if let Some(delimiter) = delimiter {
+        csv = csv.delimiter(delimiter);
     }
     Ok(csv)
 }
@@ -62,17 +62,16 @@ pub fn insert_rows(tx: &Transaction, headers: usize, rows: Csv<&[u8]>) -> Result
         insert
     };
 
+    let mut p = ui::Progress::new();
     let mut stmt = tx.prepare(&insert)?;
-    let mut n = 0;
     for row in rows {
-        n += 1;
-        progress(n, false);
+        p.progress();
         let row = row?;
         let row: Vec<&str> = row.columns()?.collect();
         let row: Vec<&ToSql> = row.iter().map(|it| it as &ToSql).collect();
         stmt.execute(row.as_slice())?;
     }
-    progress(n, true);
+    p.complete();
 
     Ok(())
 }
