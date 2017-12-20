@@ -13,6 +13,13 @@ pub enum Type {
 }
 
 
+pub enum Format {
+    Csv(Option<u8>),
+    Json,
+    Ltsv,
+}
+
+
 pub enum Input<'a> {
     File(&'a str),
     Stdin,
@@ -29,5 +36,13 @@ impl AsRef<Path> for Cache {
             Cache::File(ref path) => Path::new(path),
             Cache::Temp(ref path) => path.as_ref(),
         }
+    }
+}
+
+impl Type {
+    pub fn new(size: usize) -> Vec<Type> {
+        let mut types: Vec<Type> = vec![];
+        types.resize(size, Type::Text);
+        types
     }
 }

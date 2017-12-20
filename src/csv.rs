@@ -13,10 +13,10 @@ use types::*;
 
 
 
-pub fn open<'a>(csv_text: &'a str, delimiter: &Option<char>) -> Result<Csv<&'a [u8]>, Box<Error>> {
+pub fn open<'a>(csv_text: &'a str, delimiter: Option<u8>) -> Result<Csv<&'a [u8]>, Box<Error>> {
     let mut csv = quick_csv::Csv::from_string(csv_text);
-    if let Some(delimiter) = *delimiter {
-        csv = csv.delimiter(delimiter as u8);
+    if let Some(delimiter) = delimiter {
+        csv = csv.delimiter(delimiter);
     }
     Ok(csv)
 }
