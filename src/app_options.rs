@@ -17,7 +17,7 @@ Options:
   -c CACHE      Cache *.sqlite
   -d DELIMITER  Format: Delimter for CSV
   -e ENCODING   CSV character encoding: https://encoding.spec.whatwg.org/#concept-encoding-get
-  -g LINES      The number of rows for guess column types (defualt: 42)
+  -g LINES      Guess column types
   -j            Format: JSON
   -l            Format: LTSV
   -q SQL        SQL
