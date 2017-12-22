@@ -41,6 +41,10 @@ fn nq() -> Result<(), Box<Error>> {
     let cache = make_sqlite(&input, &options.flag_c)?;
     let cache_is_fresh = !options.flag_R && cache::is_fresh(&input, &cache)?;
 
+    if let Some(path) = cache.as_ref().to_str() {
+        eprintln!("cache: {}", path);
+    }
+
     if !cache_is_fresh {
         cache::refresh(&cache, options.format(), &input, options.flag_g, &options.flag_e)?;
     }
