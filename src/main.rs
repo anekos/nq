@@ -39,6 +39,11 @@ fn main() {
 fn nq() -> Result<(), Box<Error>> {
     let options = app_options::parse();
 
+    if options.flag_version {
+        println!("{}", env!("CARGO_PKG_VERSION").to_string());
+        exit(0);
+    }
+
     let input = parse_input(&options.arg_csv);
     let cache = make_sqlite(&input, &options.flag_c)?;
     let cache_is_fresh = !options.flag_R && cache::is_fresh(&input, &cache)?;

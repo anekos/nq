@@ -38,6 +38,7 @@ pub struct AppOptions {
     pub flag_l: bool,
     pub flag_q: Option<String>,
     pub flag_s: bool,
+    pub flag_version: bool,
     pub flag_R: bool,
     pub arg_sqlite_options: Vec<String>,
 }
