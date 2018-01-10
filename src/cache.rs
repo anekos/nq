@@ -29,7 +29,7 @@ pub fn is_fresh(input: &Input, cache: &Cache) -> Result<bool, Box<Error>> {
                     let cache = metadata(cache_filepath)?.modified()?;
                     Ok(input < cache)
                 },
-                _ => panic!("Not implemented"),
+                _ => Ok(false),
             }
         }
     }
