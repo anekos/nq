@@ -33,11 +33,12 @@ pub fn guess_types(types: &mut Vec<Type>, lines: usize, rows: Csv<&[u8]>) -> Res
         let row = row?;
         let columns: Vec<&str> = row.columns()?.collect();
         for (lv, column) in columns.iter().enumerate() {
+            let cleaned = column.replace(',', "");
             let types = &mut types[lv];
-            if *types == Type::Int && !int.is_match(column) {
+            if *types == Type::Int && !int.is_match(&cleaned) {
                 *types = Type::Real;
             }
-            if *types == Type::Real && !real.is_match(column) {
+            if *types == Type::Real && !real.is_match(&cleaned) {
                 *types = Type::Text;
             }
         }
@@ -46,7 +47,7 @@ pub fn guess_types(types: &mut Vec<Type>, lines: usize, rows: Csv<&[u8]>) -> Res
     Ok(())
 }
 
-pub fn insert_rows(tx: &Transaction, headers: usize, rows: Csv<&[u8]>) -> Result<(), Box<Error>> {
+pub fn insert_rows(tx: &Transaction, headers: usize, rows: Csv<&[u8]>, types: &[Type]) -> Result<(), Box<Error>> {
     let insert = {
         let mut insert = "INSERT INTO n VALUES(".to_owned();
         let mut first = true;
@@ -67,7 +68,18 @@ pub fn insert_rows(tx: &Transaction, headers: usize, rows: Csv<&[u8]>) -> Result
     for row in rows {
         p.progress();
         let row = row?;
-        let row: Vec<&str> = row.columns()?.collect();
+        let row: Vec<String> = row.columns()?.enumerate().map(|(index, it)| {
+            use Type::*;
+
+            if let Some(t) = types.get(index) {
+                match t {
+                    Real | Int => it.replace(',', ""),
+                    _ => it.to_owned()
+                }
+            } else {
+                it.to_owned()
+            }
+        }).collect();
         let row: Vec<&ToSql> = row.iter().map(|it| it as &ToSql).collect();
         stmt.execute(row.as_slice())?;
     }
