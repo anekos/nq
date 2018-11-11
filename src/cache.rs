@@ -15,6 +15,13 @@ use format_simple;
 use types::*;
 
 
+const ALPHAS: &[&str] = &[
+    "a", "b", "c", "d", "e", "f", "g", "h", "i", "j", "k", "l", "m", "n", "o", "p",
+    "q", "r", "s", "t", "u", "v", "w", "x", "y", "z", "A", "B", "C", "D", "E", "F",
+    "G", "H", "I", "J", "K", "L", "M", "N", "O", "P", "Q", "R", "S", "T", "U", "V",
+    "W", "X", "Y", "Z"
+];
+
 
 pub fn is_fresh(input: &Input, cache: &Cache) -> Result<bool, Box<Error>> {
     match *input {
@@ -35,7 +42,7 @@ pub fn is_fresh(input: &Input, cache: &Cache) -> Result<bool, Box<Error>> {
     }
 }
 
-pub fn refresh(cache: &Cache, format: Format, input: &Input, guess_lines: Option<usize>, encoding: &Option<String>) -> Result<(), Box<Error>> {
+pub fn refresh(cache: &Cache, format: Format, input: &Input, no_headers: bool, guess_lines: Option<usize>, encoding: &Option<String>) -> Result<(), Box<Error>> {
     let csv_text = read_file(input, encoding)?;
 
     let mut conn = Connection::open(cache)?;
@@ -64,8 +71,14 @@ pub fn refresh(cache: &Cache, format: Format, input: &Input, guess_lines: Option
         }
         Format::Csv(delimiter) => {
             let mut content = format_csv::open(&csv_text, delimiter)?;
-            let header = content.next().ok_or("Header not found")??;
-            let header = header.columns()?.collect::<Vec<&str>>();
+            let header = content.nth(0).ok_or("Header not found")??;
+            let header = if no_headers {
+                let columns = header.len();
+                alpha_header(columns)
+            } else {
+                let _ = content.next();
+                header.columns()?.collect::<Vec<&str>>()
+            };
             let mut types: Vec<Type> = vec![];
             types.resize(header.len(), Type::Int);
             if let Some(lines) = guess_lines {
@@ -115,6 +128,14 @@ fn read_file(input: &Input, encoding: &Option<String>) -> Result<String, Box<Err
     }
 
     Ok(buffer)
+}
+
+fn alpha_header(n: usize) -> Vec<&'static str> {
+    let mut result = vec![];
+    for i in 0..n {
+        result.push(ALPHAS[i]);
+    }
+    result
 }
 
 

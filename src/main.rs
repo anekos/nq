@@ -53,7 +53,7 @@ fn nq() -> Result<(), Box<Error>> {
     }
 
     if !cache_is_fresh {
-        cache::refresh(&cache, options.format(), &input, options.flag_g, &options.flag_e)?;
+        cache::refresh(&cache, options.format(), &input, options.flag_n, options.flag_g, &options.flag_e)?;
     }
 
     exec_sqlite(&cache, &options.flag_q, &options.arg_sqlite_options);

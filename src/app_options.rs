@@ -20,6 +20,7 @@ Options:
   -g LINES      Guess column types
   -j            Format: JSON
   -l            Format: LTSV
+  -n            No header line
   -q SQL        SQL
   -s            Format: Simple (white spaces split text)
   -R            Force refresh cache
@@ -36,6 +37,7 @@ pub struct AppOptions {
     pub flag_g: Option<usize>,
     pub flag_j: bool,
     pub flag_l: bool,
+    pub flag_n: bool,
     pub flag_q: Option<String>,
     pub flag_s: bool,
     pub flag_version: bool,
