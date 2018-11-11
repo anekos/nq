@@ -5,7 +5,7 @@ use types::*;
 
 
 
-const USAGE: &'static str = "
+const USAGE: &str = "
 not q
 
 Usage:

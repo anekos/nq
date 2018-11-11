@@ -22,3 +22,8 @@ rusqlite = "*"
 serde = "1.0"
 serde_derive = "1.0"
 serde_json = "*"
+
+[dev-dependencies.cargo-husky]
+version = "1"
+default-features = false
+features = ["precommit-hook", "run-cargo-test", "run-cargo-clippy"]

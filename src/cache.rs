@@ -132,8 +132,8 @@ fn read_file(input: &Input, encoding: &Option<String>) -> Result<String, Box<Err
 
 fn alpha_header(n: usize) -> Vec<&'static str> {
     let mut result = vec![];
-    for i in 0..n {
-        result.push(ALPHAS[i]);
+    for alpha in ALPHAS.iter().take(n) {
+        result.push(*alpha);
     }
     result
 }

@@ -20,10 +20,10 @@ type ObjMap = Map<String, Value>;
 pub fn header(content: &str) -> Result<Vec<String>, Box<Error>> {
     let mut names = HashSet::<String>::new();
 
-    let mut stream = Deserializer::from_str(content).into_iter::<Value>();
+    let stream = Deserializer::from_str(content).into_iter::<Value>();
     let mut p = ui::Progress::new();
 
-    while let Some(it) = stream.next() {
+    for it in stream {
         if LINES_FOR_HEADER < p.n {
             break;
         }
@@ -42,7 +42,7 @@ fn column_names(value: &Value) -> Result<Vec<String>, Box<Error>> {
     fn load_object(prefix: &str, result: &mut Vec<String>, object: &ObjMap) -> Result<(), Box<Error>> {
         for (n, v) in object.iter() {
             let mut new_prefix = prefix.to_string();
-            if 0 < prefix.len() {
+            if !prefix.is_empty() {
                 new_prefix.push(NAME_DELIMITER);
             }
             new_prefix.push_str(n);
@@ -59,18 +59,17 @@ fn column_names(value: &Value) -> Result<Vec<String>, Box<Error>> {
     }
 
     let mut result = Vec::<String>::new();
-    match *value {
-        Value::Object(ref obj) => load_object("", &mut result, obj)?,
-        _ => (),
+    if let Value::Object(ref obj) = *value {
+        load_object("", &mut result, obj)?;
     }
     Ok(result)
 }
 
 pub fn insert_rows(tx: &Transaction, content: &str) -> Result<(), Box<Error>> {
-    let mut stream = Deserializer::from_str(content).into_iter::<Value>();
+    let stream = Deserializer::from_str(content).into_iter::<Value>();
 
     let mut p = ui::Progress::new();
-    while let Some(it) = stream.next() {
+    for it in stream {
         p.progress();
         if let Value::Object(ref obj) = it? {
             insert_row(tx, obj)?;
@@ -85,7 +84,7 @@ pub fn insert_row(tx: &Transaction, obj: &ObjMap) -> Result<(), Box<Error>> {
     fn load_object(prefix: &str, names: &mut String, values: &mut String, args: &mut Vec<String>, object: &ObjMap) -> Result<(), Box<Error>> {
         for (n, v) in object.iter() {
             let mut new_prefix = prefix.to_string();
-            if 0 < prefix.len() {
+            if !prefix.is_empty() {
                 new_prefix.push(NAME_DELIMITER);
             }
             new_prefix.push_str(n);
@@ -101,7 +100,7 @@ pub fn insert_row(tx: &Transaction, obj: &ObjMap) -> Result<(), Box<Error>> {
                 _ => continue,
             };
 
-            if 0 < names.len() {
+            if !names.is_empty() {
                 names.push(',');
                 values.push(',');
             }

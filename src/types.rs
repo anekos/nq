@@ -13,6 +13,7 @@ pub enum Type {
 }
 
 
+#[derive(Clone, Copy)]
 pub enum Format {
     Csv(Option<u8>),
     Json,

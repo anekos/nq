@@ -61,7 +61,7 @@ fn nq() -> Result<(), Box<Error>> {
     Ok(())
 }
 
-fn parse_input<'a>(filepath: &'a str) -> Input<'a> {
+fn parse_input(filepath: &str) -> Input {
     match filepath {
         "-" => Input::Stdin,
         _ => Input::File(filepath)
