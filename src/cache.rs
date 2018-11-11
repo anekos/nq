@@ -88,7 +88,7 @@ pub fn refresh(cache: &Cache, format: Format, input: &Input, no_headers: bool, g
             }
 
             create_table(&tx, &types, header.as_slice())?;
-            format_csv::insert_rows(&tx, header.len(), content)?;
+            format_csv::insert_rows(&tx, header.len(), content, &types)?;
         }
     }
 
