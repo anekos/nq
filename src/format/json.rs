@@ -1,13 +1,14 @@
 
 use std::collections::HashSet;
-use std::error::Error;
 
 use rusqlite:: Transaction;
 use rusqlite::types::ToSql;
 use serde_json::{Deserializer, Value, Map};
 
+use crate::errors::{AppResult, AppResultU};
 use crate::sql;
 use crate::ui;
+
 
 
 const NAME_DELIMITER: char =  '_';
@@ -17,7 +18,7 @@ const LINES_FOR_HEADER: usize = 100;
 type ObjMap = Map<String, Value>;
 
 
-pub fn header(content: &str) -> Result<Vec<String>, Box<Error>> {
+pub fn header(content: &str) -> AppResult<Vec<String>> {
     let mut names = HashSet::<String>::new();
 
     let stream = Deserializer::from_str(content).into_iter::<Value>();
@@ -38,8 +39,8 @@ pub fn header(content: &str) -> Result<Vec<String>, Box<Error>> {
     Ok(names.into_iter().collect())
 }
 
-fn column_names(value: &Value) -> Result<Vec<String>, Box<Error>> {
-    fn load_object(prefix: &str, result: &mut Vec<String>, object: &ObjMap) -> Result<(), Box<Error>> {
+fn column_names(value: &Value) -> AppResult<Vec<String>> {
+    fn load_object(prefix: &str, result: &mut Vec<String>, object: &ObjMap) -> AppResultU {
         for (n, v) in object.iter() {
             let mut new_prefix = prefix.to_string();
             if !prefix.is_empty() {
@@ -65,7 +66,7 @@ fn column_names(value: &Value) -> Result<Vec<String>, Box<Error>> {
     Ok(result)
 }
 
-pub fn insert_rows(tx: &Transaction, content: &str) -> Result<(), Box<Error>> {
+pub fn insert_rows(tx: &Transaction, content: &str) -> AppResultU {
     let stream = Deserializer::from_str(content).into_iter::<Value>();
 
     let mut p = ui::Progress::new();
@@ -80,8 +81,8 @@ pub fn insert_rows(tx: &Transaction, content: &str) -> Result<(), Box<Error>> {
     Ok(())
 }
 
-pub fn insert_row(tx: &Transaction, obj: &ObjMap) -> Result<(), Box<Error>> {
-    fn load_object(prefix: &str, names: &mut String, values: &mut String, args: &mut Vec<String>, object: &ObjMap) -> Result<(), Box<Error>> {
+pub fn insert_row(tx: &Transaction, obj: &ObjMap) -> AppResultU {
+    fn load_object(prefix: &str, names: &mut String, values: &mut String, args: &mut Vec<String>, object: &ObjMap) -> AppResultU {
         for (n, v) in object.iter() {
             let mut new_prefix = prefix.to_string();
             if !prefix.is_empty() {

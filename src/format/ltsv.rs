@@ -1,15 +1,15 @@
 
 use std::collections::HashSet;
-use std::error::Error;
 
 use rusqlite::types::ToSql;
 use rusqlite:: Transaction;
 
+use crate::errors::{AppResult, AppResultU};
 use crate::ui;
 
 
 
-pub fn header(content: &str) -> Result<Vec<&str>, Box<Error>> {
+pub fn header(content: &str) -> AppResult<Vec<&str>> {
     let mut names = HashSet::<&str>::new();
 
     for row in content.lines() {
@@ -29,7 +29,7 @@ pub fn header(content: &str) -> Result<Vec<&str>, Box<Error>> {
     Ok(names.into_iter().collect())
 }
 
-pub fn insert_rows(tx: &Transaction, content: &str) -> Result<(), Box<Error>> {
+pub fn insert_rows(tx: &Transaction, content: &str) -> AppResultU {
     let mut p = ui::Progress::new();
 
     for row in content.lines() {

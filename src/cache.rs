@@ -1,4 +1,4 @@
-use std::error::Error;
+
 use std::fs::File;
 use std::fs::metadata;
 use std::io::{self, Read};
@@ -10,6 +10,7 @@ use rusqlite::{Transaction, Connection};
 
 use crate::format;
 use crate::types::*;
+use crate::errors::{AppResult, AppResultU};
 
 
 
@@ -21,7 +22,7 @@ const ALPHAS: &[&str] = &[
 ];
 
 
-pub fn is_fresh(input: &Input, cache: &Cache) -> Result<bool, Box<Error>> {
+pub fn is_fresh(input: &Input, cache: &Cache) -> AppResult<bool> {
     match *input {
         Input::Stdin => Ok(false),
         Input::File(input_filepath) => {
@@ -40,7 +41,7 @@ pub fn is_fresh(input: &Input, cache: &Cache) -> Result<bool, Box<Error>> {
     }
 }
 
-pub fn refresh(cache: &Cache, format: Format, input: &Input, no_headers: bool, guess_lines: Option<usize>, encoding: &Option<String>) -> Result<(), Box<Error>> {
+pub fn refresh(cache: &Cache, format: Format, input: &Input, no_headers: bool, guess_lines: Option<usize>, encoding: &Option<String>) -> AppResultU {
     let csv_text = read_file(input, encoding)?;
 
     let mut conn = Connection::open(cache)?;
@@ -94,7 +95,7 @@ pub fn refresh(cache: &Cache, format: Format, input: &Input, no_headers: bool, g
     Ok(())
 }
 
-fn read_file(input: &Input, encoding: &Option<String>) -> Result<String, Box<Error>> {
+fn read_file(input: &Input, encoding: &Option<String>) -> AppResult<String> {
     let mut buffer = String::new();
 
     if let Some(ref encoding) = *encoding {
@@ -137,7 +138,7 @@ fn alpha_header(n: usize) -> Vec<&'static str> {
 }
 
 
-pub fn create_table(tx: &Transaction, types: &[Type], header: &[&str]) -> Result<(), Box<Error>> {
+pub fn create_table(tx: &Transaction, types: &[Type], header: &[&str]) -> AppResultU {
     let mut create = "CREATE TABLE n (".to_owned();
     let mut first = true;
     for (i, name) in header.iter().enumerate() {

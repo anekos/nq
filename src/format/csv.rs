@@ -1,17 +1,16 @@
 
-use std::error::Error;
-
 use quick_csv::Csv;
 use regex::Regex;
 use rusqlite:: Transaction;
 use rusqlite::types::ToSql;
 
+use crate::errors::{AppResult, AppResultU};
 use crate::ui;
 use crate::types::*;
 
 
 
-pub fn open<'a>(csv_text: &'a str, delimiter: Option<u8>) -> Result<Csv<&'a [u8]>, Box<Error>> {
+pub fn open<'a>(csv_text: &'a str, delimiter: Option<u8>) -> AppResult<Csv<&'a [u8]>> {
     let mut csv = quick_csv::Csv::from_string(csv_text);
     if let Some(delimiter) = delimiter {
         csv = csv.delimiter(delimiter);
@@ -19,7 +18,7 @@ pub fn open<'a>(csv_text: &'a str, delimiter: Option<u8>) -> Result<Csv<&'a [u8]
     Ok(csv)
 }
 
-pub fn guess_types(types: &mut Vec<Type>, lines: usize, rows: Csv<&[u8]>) -> Result<(), Box<Error>> {
+pub fn guess_types(types: &mut Vec<Type>, lines: usize, rows: Csv<&[u8]>) -> AppResultU {
     if 0 == lines {
         return Ok(());
     }
@@ -45,7 +44,7 @@ pub fn guess_types(types: &mut Vec<Type>, lines: usize, rows: Csv<&[u8]>) -> Res
     Ok(())
 }
 
-pub fn insert_rows(tx: &Transaction, headers: usize, rows: Csv<&[u8]>, types: &[Type]) -> Result<(), Box<Error>> {
+pub fn insert_rows(tx: &Transaction, headers: usize, rows: Csv<&[u8]>, types: &[Type]) -> AppResultU {
     let insert = {
         let mut insert = "INSERT INTO n VALUES(".to_owned();
         let mut first = true;

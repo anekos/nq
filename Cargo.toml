@@ -16,6 +16,7 @@ doc = false
 [dependencies]
 docopt = "*"
 encoding = "*"
+failure = "*"
 mktemp = "*"
 quick-csv = "*"
 regex = "*"

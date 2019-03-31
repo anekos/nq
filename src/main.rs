@@ -9,31 +9,32 @@ extern crate regex;
 extern crate rusqlite;
 
 use std::env;
-use std::error::Error;
 use std::fs;
 use std::os::unix::process::CommandExt;
 use std::process::{exit, Command};
 
 mod app_options;
 mod cache;
+mod errors;
 mod format;
 mod sql;
 mod types;
 mod ui;
 
 use types::*;
+use errors::{AppResult, AppResultU};
 
 
 
 fn main() {
     if let Err(err) = nq() {
-        println!("Error: {}", err);
+        eprintln!("{}", err);
         exit(1);
     }
 }
 
 
-fn nq() -> Result<(), Box<Error>> {
+fn nq() -> AppResultU {
     let options = app_options::parse();
 
     if options.flag_version {
@@ -65,7 +66,7 @@ fn parse_input(filepath: &str) -> Input {
     }
 }
 
-fn make_sqlite(input: &Input, cache_filepath: &Option<String>) -> Result <Cache, Box<Error>> {
+fn make_sqlite(input: &Input, cache_filepath: &Option<String>) -> AppResult<Cache> {
     match *input {
         Input::Stdin => Ok(Cache::Temp(mktemp::Temp::new_file()?)),
         Input::File(ref input_path) => {

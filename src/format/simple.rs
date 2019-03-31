@@ -1,12 +1,11 @@
 
 extern crate quick_csv;
 
-use std::error::Error;
-
 use regex::Regex;
 use rusqlite:: Transaction;
 use rusqlite::types::ToSql;
 
+use crate::errors::{AppResult, AppResultU};
 use crate::ui;
 
 
@@ -17,7 +16,7 @@ pub struct Reader {
 
 
 impl Reader {
-    pub fn new() -> Result<Reader, Box<Error>> {
+    pub fn new() -> AppResult<Reader> {
         Ok(Reader { pattern: Regex::new(r"[ \t]+")? })
     }
 
@@ -26,7 +25,7 @@ impl Reader {
         Ok(self.split(line, None))
     }
 
-    pub fn insert_rows(&self, tx: &Transaction, headers: usize, rows: &str) -> Result<(), Box<Error>> {
+    pub fn insert_rows(&self, tx: &Transaction, headers: usize, rows: &str) -> AppResultU {
         let insert = {
             let mut insert = "INSERT INTO n VALUES(".to_owned();
             let mut first = true;
