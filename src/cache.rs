@@ -8,11 +8,9 @@ use encoding::DecoderTrap;
 use encoding::label::encoding_from_whatwg_label;
 use rusqlite::{Transaction, Connection};
 
-use format_csv;
-use format_json;
-use format_ltsv;
-use format_simple;
-use types::*;
+use crate::format;
+use crate::types::*;
+
 
 
 const ALPHAS: &[&str] = &[
@@ -50,27 +48,27 @@ pub fn refresh(cache: &Cache, format: Format, input: &Input, no_headers: bool, g
 
     match format {
         Format::Ltsv => {
-            let header = format_ltsv::header(&csv_text)?;
+            let header = format::ltsv::header(&csv_text)?;
             let types = Type::new(header.len());
             create_table(&tx, &types, header.as_slice())?;
-            format_ltsv::insert_rows(&tx, &csv_text)?;
+            format::ltsv::insert_rows(&tx, &csv_text)?;
         }
         Format::Json => {
-            let header = format_json::header(&csv_text)?;
+            let header = format::json::header(&csv_text)?;
             let header: Vec<&str> = header.iter().map(|it| it.as_ref()).collect();
             let types = Type::new(header.len());
             create_table(&tx, &types, header.as_slice())?;
-            format_json::insert_rows(&tx, &csv_text)?;
+            format::json::insert_rows(&tx, &csv_text)?;
         }
         Format::Simple => {
-            let reader = format_simple::Reader::new()?;
+            let reader = format::simple::Reader::new()?;
             let header = reader.header(&csv_text)?;
             let types = Type::new(header.len());
             create_table(&tx, &types, header.as_slice())?;
             reader.insert_rows(&tx, header.len(), &csv_text)?;
         }
         Format::Csv(delimiter) => {
-            let mut content = format_csv::open(&csv_text, delimiter)?;
+            let mut content = format::csv::open(&csv_text, delimiter)?;
             let header = content.nth(0).ok_or("Header not found")??;
             let header = if no_headers {
                 let columns = header.len();
@@ -82,13 +80,13 @@ pub fn refresh(cache: &Cache, format: Format, input: &Input, no_headers: bool, g
             let mut types: Vec<Type> = vec![];
             types.resize(header.len(), Type::Int);
             if let Some(lines) = guess_lines {
-                let mut content = format_csv::open(&csv_text, delimiter)?;
+                let mut content = format::csv::open(&csv_text, delimiter)?;
                 content.next().ok_or("No header")??;
-                format_csv::guess_types(&mut types, lines, content)?
+                format::csv::guess_types(&mut types, lines, content)?
             }
 
             create_table(&tx, &types, header.as_slice())?;
-            format_csv::insert_rows(&tx, header.len(), content, &types)?;
+            format::csv::insert_rows(&tx, header.len(), content, &types)?;
         }
     }
 

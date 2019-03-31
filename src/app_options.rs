@@ -1,7 +1,7 @@
 
 use docopt::Docopt;
 
-use types::*;
+use crate::types::*;
 
 
 

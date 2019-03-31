@@ -16,10 +16,7 @@ use std::process::{exit, Command};
 
 mod app_options;
 mod cache;
-mod format_csv;
-mod format_json;
-mod format_ltsv;
-mod format_simple;
+mod format;
 mod sql;
 mod types;
 mod ui;

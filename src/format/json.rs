@@ -6,8 +6,8 @@ use rusqlite:: Transaction;
 use rusqlite::types::ToSql;
 use serde_json::{Deserializer, Value, Map};
 
-use sql;
-use ui;
+use crate::sql;
+use crate::ui;
 
 
 const NAME_DELIMITER: char =  '_';

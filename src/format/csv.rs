@@ -1,6 +1,4 @@
 
-extern crate quick_csv;
-
 use std::error::Error;
 
 use quick_csv::Csv;
@@ -8,8 +6,8 @@ use regex::Regex;
 use rusqlite:: Transaction;
 use rusqlite::types::ToSql;
 
-use ui;
-use types::*;
+use crate::ui;
+use crate::types::*;
 
 
 
