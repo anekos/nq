@@ -21,20 +21,21 @@ mod sql;
 mod types;
 mod ui;
 
-use types::*;
+use cache::Cache;
 use errors::{AppResult, AppResultU};
+use types::*;
 
 
 
 fn main() {
-    if let Err(err) = nq() {
+    if let Err(err) = app() {
         eprintln!("{}", err);
         exit(1);
     }
 }
 
 
-fn nq() -> AppResultU {
+fn app() -> AppResultU {
     let options = app_options::parse();
 
     if options.flag_version {
@@ -44,14 +45,22 @@ fn nq() -> AppResultU {
 
     let input = parse_input(&options.arg_csv);
     let cache = make_sqlite(&input, &options.flag_c)?;
-    let cache_is_fresh = !options.flag_R && cache::is_fresh(&input, &cache)?;
+    let cache_state = cache::State::get(&input, &cache)?;
 
     if let Some(path) = cache.as_ref().to_str() {
         eprintln!("cache: {}", path);
     }
 
-    if !cache_is_fresh {
-        cache::refresh(&cache, options.format(), &input, options.flag_n, options.flag_g, &options.flag_e)?;
+    if !options.flag_R && !cache_state.is_fresh() {
+        match cache.refresh(options.format(), &input, options.flag_n, options.flag_g, &options.flag_e) {
+            Ok(_) => (),
+            err => {
+                if cache_state == cache::State::Nothing {
+                    cache.remove_file()?;
+                }
+                return err;
+            }
+        }
     }
 
     exec_sqlite(&cache, &options.flag_q, &options.arg_sqlite_options);
