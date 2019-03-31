@@ -94,7 +94,7 @@ pub fn insert_row(tx: &Transaction, obj: &ObjMap) -> Result<(), Box<Error>> {
                     load_object(&new_prefix, names, values, args, obj)?;
                     continue;
                 }
-                Value::String(ref v) => sql::quote_string(v),
+                Value::String(ref v) => v.to_string(),
                 Value::Number(ref v) => format!("{}", v),
                 Value::Bool(ref v) => if *v { "1" } else { "0" } .to_string(),
                 _ => continue,
