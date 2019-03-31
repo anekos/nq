@@ -29,7 +29,7 @@ pub fn guess_types(types: &mut Vec<Type>, lines: usize, rows: Csv<&[u8]>) -> Res
     let int = Regex::new("^[-+]?\\d{1,18}$")?;
     let real = Regex::new("^[-+]?\\d+\\.\\d+$")?;
 
-    for row in rows.into_iter().take(lines) {
+    for row in rows.take(lines) {
         let row = row?;
         let columns: Vec<&str> = row.columns()?.collect();
         for (lv, column) in columns.iter().enumerate() {
