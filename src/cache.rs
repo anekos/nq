@@ -66,34 +66,34 @@ impl State {
 
 impl Cache {
     pub fn refresh(&self, format: Format, input: &Input, no_headers: bool, guess_lines: Option<usize>, encoding: &Option<String>) -> AppResultU {
-        let csv_text = read_file(input, encoding)?;
+        let source = read_file(input, encoding)?;
 
         let mut conn = Connection::open(self)?;
         let tx = conn.transaction()?;
 
         match format {
             Format::Ltsv => {
-                let header = format::ltsv::header(&csv_text)?;
+                let header = format::ltsv::header(&source)?;
                 let types = Type::new(header.len());
                 create_table(&tx, &types, header.as_slice())?;
-                format::ltsv::insert_rows(&tx, &csv_text)?;
+                format::ltsv::insert_rows(&tx, &source)?;
             }
             Format::Json => {
-                let header = format::json::header(&csv_text)?;
+                let header = format::json::header(&source)?;
                 let header: Vec<&str> = header.iter().map(|it| it.as_ref()).collect();
                 let types = Type::new(header.len());
                 create_table(&tx, &types, header.as_slice())?;
-                format::json::insert_rows(&tx, &csv_text)?;
+                format::json::insert_rows(&tx, &source)?;
             }
             Format::Simple => {
                 let reader = format::simple::Reader::new()?;
-                let header = reader.header(&csv_text)?;
+                let header = reader.header(&source)?;
                 let types = Type::new(header.len());
                 create_table(&tx, &types, header.as_slice())?;
-                reader.insert_rows(&tx, header.len(), &csv_text)?;
+                reader.insert_rows(&tx, header.len(), &source)?;
             }
             Format::Csv(delimiter) => {
-                let mut content = format::csv::open(&csv_text, delimiter)?;
+                let mut content = format::csv::open(&source, delimiter)?;
                 let header = content.nth(0).ok_or("Header not found")??;
                 let header = if no_headers {
                     let columns = header.len();
@@ -105,7 +105,7 @@ impl Cache {
                 let mut types: Vec<Type> = vec![];
                 types.resize(header.len(), Type::Int);
                 if let Some(lines) = guess_lines {
-                    let mut content = format::csv::open(&csv_text, delimiter)?;
+                    let mut content = format::csv::open(&source, delimiter)?;
                     content.next().ok_or("No header")??;
                     format::csv::guess_types(&mut types, lines, content)?
                 }
