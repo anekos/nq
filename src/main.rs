@@ -52,7 +52,7 @@ fn app() -> AppResultU {
         eprintln!("cache: {}", path);
     }
 
-    if !options.flag_R && !cache_state.is_fresh() {
+    if options.flag_R || !cache_state.is_fresh() {
         match cache.refresh(options.format(), &input, options.flag_n, options.flag_g, &options.flag_e) {
             Ok(_) => (),
             err => {
