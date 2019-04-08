@@ -48,12 +48,13 @@ fn app() -> AppResultU {
 
     let input = parse_input(&options.arg_csv);
     let source = make_sqlite(&input, &options.flag_c)?;
+    let format = options.format();
 
     let mut conn = Connection::open(source.as_ref())?;
     let tx = conn.transaction()?;
 
     let cache = Cache::new(&source, tx);
-    let cache_state = cache.state(&input)?;
+    let cache_state = cache.state(&input, &format)?;
     let config = loader::Config { no_headers: options.flag_n, guess_lines: options.flag_g };
 
     if let Some(path) = source.as_ref().to_str() {
@@ -61,7 +62,7 @@ fn app() -> AppResultU {
     }
 
     if options.flag_R || !cache_state.is_fresh() {
-        match cache.refresh(options.format(), &input, &config,  &options.flag_e) {
+        match cache.refresh(&format, &input, &config,  &options.flag_e) {
             Ok(_) => (),
             err => {
                 if cache_state == cache::State::Nothing {

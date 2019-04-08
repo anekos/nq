@@ -10,7 +10,7 @@ pub enum Type {
     Text = 0
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub enum Format {
     Csv(Option<u8>),
     Json,
@@ -25,6 +25,11 @@ pub enum Input<'a> {
 }
 
 
+impl Format {
+    pub fn to_string(&self) -> String {
+        format!("{:?}", self)
+    }
+}
 
 impl Type {
     pub fn new(size: usize) -> Vec<Type> {

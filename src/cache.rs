@@ -8,7 +8,7 @@ use encoding::label::encoding_from_whatwg_label;
 use regex::Regex;
 use rusqlite::Transaction;
 
-use crate::errors::{AppResult, AppResultU};
+use crate::errors::{AppError, AppResult, AppResultU};
 use crate::loader::{Config, Loader, self};
 use crate::types::*;
 
@@ -33,11 +33,30 @@ pub enum Source {
 
 
 impl<'a> Cache<'a> {
+    pub fn format(&self) -> AppResult<String> {
+        let meta: u32 = self.tx.query_row("SELECT COUNT(*) FROM sqlite_master WHERE type = 'table' AND name = 'meta'", &[], |row| row.get(0))?;
+        match meta {
+            0 => {
+                self.tx.execute("CREATE TABLE meta (name TEXT PRIMARY KEY, value TEXT);", &[])?;
+                Ok("".to_owned())
+            },
+            1 => {
+                let result = self.tx.query_row("SELECT value FROM meta WHERE name = 'format'", &[], |row| row.get(0));
+                match result {
+                    Ok(format) => Ok(format),
+                    Err(rusqlite::Error::QueryReturnedNoRows) => Ok("".to_owned()),
+                    Err(err) => Err(AppError::Sql(err)),
+                }
+            },
+            _ => panic!("BUG"),
+        }
+    }
+
     pub fn new(source: &'a Source, tx: Transaction<'a>) -> Self {
         Self { source, tx }
     }
 
-    pub fn refresh(self, format: Format, input: &Input, config: &Config, encoding: &Option<String>) -> AppResultU {
+    pub fn refresh(self, format: &Format, input: &Input, config: &Config, encoding: &Option<String>) -> AppResultU {
         let source = read_file(input, encoding)?;
 
         let load = |loader: &Loader| {
@@ -46,7 +65,7 @@ impl<'a> Cache<'a> {
 
         match format {
             Format::Csv(delimiter) =>
-                load(&loader::Csv { delimiter })?,
+                load(&loader::Csv { delimiter: *delimiter })?,
             Format::Json =>
                 load(&loader::Json())?,
             Format::Ltsv =>
@@ -57,11 +76,20 @@ impl<'a> Cache<'a> {
                 load(&loader::Simple { delimiter: Regex::new(r"[ \t]+")? })?,
         }
 
+        let updated = self.tx.execute("UPDATE meta SET value = ? WHERE name = 'format';", &[&format.to_string()])?;
+        match updated {
+            0 => {
+                self.tx.execute("INSERT INTO meta VALUES('format', ?);", &[&format.to_string()])?;
+            },
+            1 => (),
+            n => panic!("UPDATE has returned: {}", n),
+        }
+
         self.tx.commit()?;
         Ok(())
     }
 
-    pub fn state(&self, input: &Input) -> AppResult<State> {
+    pub fn state(&self, input: &Input, format: &Format) -> AppResult<State> {
         match *input {
             Input::Stdin => Ok(State::Nothing),
             Input::File(input_filepath) => {
@@ -72,7 +100,7 @@ impl<'a> Cache<'a> {
                         }
                         let input = metadata(input_filepath)?.modified()?;
                         let cache = metadata(cache_filepath)?.modified()?;
-                        Ok(if input < cache {
+                        Ok(if input < cache && format.to_string() == self.format()? {
                             State::Fresh
                         } else {
                             State::Stale
