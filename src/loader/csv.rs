@@ -20,7 +20,7 @@ impl super::Loader for Loader {
     fn load(&self, tx: &Transaction, source: &str, config: &super::Config) -> AppResultU {
         let mut content = open(&source, self.delimiter)?;
         let header = content.nth(0).ok_or("Header not found")??;
-        let header = if config.no_headers {
+        let header = if config.no_header {
             let columns = header.len();
             super::alpha_header(columns)
         } else {

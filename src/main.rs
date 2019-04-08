@@ -55,7 +55,7 @@ fn app() -> AppResultU {
 
     let cache = Cache::new(&source, tx);
     let cache_state = cache.state(&input, &format)?;
-    let config = loader::Config { no_headers: options.flag_n, guess_lines: options.flag_g };
+    let config = loader::Config { no_header: options.flag_n, guess_lines: options.flag_g };
 
     if let Some(path) = source.as_ref().to_str() {
         eprintln!("cache: {}", path);

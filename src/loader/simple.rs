@@ -19,7 +19,7 @@ pub struct Loader {
 
 impl super::Loader for Loader {
     fn load(&self, tx: &Transaction, source: &str, config: &super::Config) -> AppResultU {
-        let header = self.header(&source, config.no_headers)?;
+        let header = self.header(&source, config.no_header)?;
         let types = Type::new(header.len());
         tx.create_table(&types, header.as_slice())?;
         self.insert_rows(tx, header.len(), &source)?;

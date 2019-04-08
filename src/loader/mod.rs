@@ -19,7 +19,7 @@ pub use simple::{Loader as Simple};
 
 pub struct Config {
     pub guess_lines: Option<usize>,
-    pub no_headers: bool,
+    pub no_header: bool,
 }
 
 pub trait Loader {
