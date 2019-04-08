@@ -76,13 +76,15 @@ impl<'a> Cache<'a> {
                 load(&loader::Simple { delimiter: Regex::new(r"[ \t]+")? })?,
         }
 
-        let updated = self.tx.execute("UPDATE meta SET value = ? WHERE name = 'format';", &[&format.to_string()])?;
-        match updated {
-            0 => {
-                self.tx.execute("INSERT INTO meta VALUES('format', ?);", &[&format.to_string()])?;
-            },
-            1 => (),
-            n => panic!("UPDATE has returned: {}", n),
+        if let Source::File(_) = self.source {
+            let updated = self.tx.execute("UPDATE meta SET value = ? WHERE name = 'format';", &[&format.to_string()])?;
+            match updated {
+                0 => {
+                    self.tx.execute("INSERT INTO meta VALUES('format', ?);", &[&format.to_string()])?;
+                },
+                1 => (),
+                n => panic!("UPDATE has returned: {}", n),
+            }
         }
 
         self.tx.commit()?;
