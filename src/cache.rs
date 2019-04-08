@@ -72,26 +72,6 @@ impl Cache {
         let tx = conn.transaction()?;
 
         match format {
-            Format::Ltsv => {
-                let header = format::ltsv::header(&source)?;
-                let types = Type::new(header.len());
-                create_table(&tx, &types, header.as_slice())?;
-                format::ltsv::insert_rows(&tx, &source)?;
-            }
-            Format::Json => {
-                let header = format::json::header(&source)?;
-                let header: Vec<&str> = header.iter().map(|it| it.as_ref()).collect();
-                let types = Type::new(header.len());
-                create_table(&tx, &types, header.as_slice())?;
-                format::json::insert_rows(&tx, &source)?;
-            }
-            Format::Simple => {
-                let reader = format::simple::Reader::new()?;
-                let header = reader.header(&source)?;
-                let types = Type::new(header.len());
-                create_table(&tx, &types, header.as_slice())?;
-                reader.insert_rows(&tx, header.len(), &source)?;
-            }
             Format::Csv(delimiter) => {
                 let mut content = format::csv::open(&source, delimiter)?;
                 let header = content.nth(0).ok_or("Header not found")??;
@@ -112,7 +92,27 @@ impl Cache {
 
                 create_table(&tx, &types, header.as_slice())?;
                 format::csv::insert_rows(&tx, header.len(), content, &types)?;
-            }
+            },
+            Format::Json => {
+                let header = format::json::header(&source)?;
+                let header: Vec<&str> = header.iter().map(|it| it.as_ref()).collect();
+                let types = Type::new(header.len());
+                create_table(&tx, &types, header.as_slice())?;
+                format::json::insert_rows(&tx, &source)?;
+            },
+            Format::Ltsv => {
+                let header = format::ltsv::header(&source)?;
+                let types = Type::new(header.len());
+                create_table(&tx, &types, header.as_slice())?;
+                format::ltsv::insert_rows(&tx, &source)?;
+            },
+            Format::Simple => {
+                let reader = format::simple::Reader::new()?;
+                let header = reader.header(&source)?;
+                let types = Type::new(header.len());
+                create_table(&tx, &types, header.as_slice())?;
+                reader.insert_rows(&tx, header.len(), &source)?;
+            },
         }
 
         tx.commit()?;
