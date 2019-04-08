@@ -14,6 +14,8 @@ pub enum AppError {
     Io(std::io::Error),
     #[fail(display = "CSV Error: {}", 0)]
     Csv(quick_csv::error::Error),
+    #[fail(display = "Few columns")]
+    FewColumns,
     #[fail(display = "Error: {}", 0)]
     Fixed(&'static str),
     #[fail(display = "Json Error: {}", 0)]

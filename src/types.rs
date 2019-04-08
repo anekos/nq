@@ -10,11 +10,12 @@ pub enum Type {
     Text = 0
 }
 
-#[derive(Clone, Copy)]
+#[derive(Clone)]
 pub enum Format {
     Csv(Option<u8>),
     Json,
     Ltsv,
+    Regex(String),
     Simple,
 }
 

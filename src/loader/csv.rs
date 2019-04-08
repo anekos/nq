@@ -11,14 +11,6 @@ use crate::types::*;
 
 
 
-const ALPHAS: &[&str] = &[
-    "a", "b", "c", "d", "e", "f", "g", "h", "i", "j", "k", "l", "m", "n", "o", "p",
-    "q", "r", "s", "t", "u", "v", "w", "x", "y", "z", "A", "B", "C", "D", "E", "F",
-    "G", "H", "I", "J", "K", "L", "M", "N", "O", "P", "Q", "R", "S", "T", "U", "V",
-    "W", "X", "Y", "Z"
-];
-
-
 pub struct Loader {
     pub delimiter: Option<u8>,
 }
@@ -30,7 +22,7 @@ impl super::Loader for Loader {
         let header = content.nth(0).ok_or("Header not found")??;
         let header = if config.no_headers {
             let columns = header.len();
-            alpha_header(columns)
+            super::alpha_header(columns)
         } else {
             let _ = content.next();
             header.columns()?.collect::<Vec<&str>>()
@@ -49,14 +41,6 @@ impl super::Loader for Loader {
     }
 }
 
-
-fn alpha_header(n: usize) -> Vec<&'static str> {
-    let mut result = vec![];
-    for alpha in ALPHAS.iter().take(n) {
-        result.push(*alpha);
-    }
-    result
-}
 
 fn guess_types(types: &mut Vec<Type>, lines: usize, rows: Csv<&[u8]>) -> AppResultU {
     if 0 == lines {

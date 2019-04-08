@@ -77,6 +77,8 @@ impl Cache {
                 load(&loader::Json())?,
             Format::Ltsv =>
                 load(&loader::Ltsv())?,
+            Format::Regex(ref format) =>
+                load(&loader::Regex { format: Regex::new(format)? })?,
             Format::Simple =>
                 load(&loader::Simple { delimiter: Regex::new(r"[ \t]+")? })?,
         }

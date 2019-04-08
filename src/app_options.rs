@@ -20,6 +20,7 @@ Options:
   -g LINES      Guess column types
   -j            Format: JSON
   -l            Format: LTSV
+  -r FORMAT     Format: Regular expression
   -n            No header line
   -q SQL        SQL
   -s            Format: Simple (white spaces split text)
@@ -35,6 +36,7 @@ pub struct AppOptions {
     pub flag_d: Option<char>,
     pub flag_e: Option<String>,
     pub flag_g: Option<usize>,
+    pub flag_r: Option<String>,
     pub flag_j: bool,
     pub flag_l: bool,
     pub flag_n: bool,
@@ -57,6 +59,8 @@ impl AppOptions {
             Format::Json
         } else if self.flag_s {
             Format::Simple
+        } else if let Some(ref format) = self.flag_r {
+            Format::Regex(format.to_owned())
         } else {
             Format::Csv(self.flag_d.map(|it| it as u8))
         }
