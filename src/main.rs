@@ -51,16 +51,17 @@ fn app() -> AppResultU {
 
     let mut conn = Connection::open(source.as_ref())?;
     let tx = conn.transaction()?;
-    let cache = Cache::new(&source, tx);
 
+    let cache = Cache::new(&source, tx);
     let cache_state = cache.state(&input)?;
+    let config = loader::Config { no_headers: options.flag_n, guess_lines: options.flag_g };
 
     if let Some(path) = source.as_ref().to_str() {
         eprintln!("cache: {}", path);
     }
 
     if options.flag_R || !cache_state.is_fresh() {
-        match cache.refresh(options.format(), &input, options.flag_n, options.flag_g, &options.flag_e) {
+        match cache.refresh(options.format(), &input, &config,  &options.flag_e) {
             Ok(_) => (),
             err => {
                 if cache_state == cache::State::Nothing {

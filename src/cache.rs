@@ -9,7 +9,7 @@ use regex::Regex;
 use rusqlite::Transaction;
 
 use crate::errors::{AppResult, AppResultU};
-use crate::loader::{Loader, self};
+use crate::loader::{Config, Loader, self};
 use crate::types::*;
 
 
@@ -37,13 +37,11 @@ impl<'a> Cache<'a> {
         Self { source, tx }
     }
 
-    pub fn refresh(self, format: Format, input: &Input, no_headers: bool, guess_lines: Option<usize>, encoding: &Option<String>) -> AppResultU {
+    pub fn refresh(self, format: Format, input: &Input, config: &Config, encoding: &Option<String>) -> AppResultU {
         let source = read_file(input, encoding)?;
 
-        let config = loader::Config { no_headers, guess_lines };
-
         let load = |loader: &Loader| {
-            loader.load(&self.tx, &source, &config)
+            loader.load(&self.tx, &source, config)
         };
 
         match format {
