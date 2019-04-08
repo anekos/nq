@@ -15,8 +15,9 @@ use std::process::{exit, Command};
 
 mod app_options;
 mod cache;
+mod db;
 mod errors;
-mod format;
+mod loader;
 mod sql;
 mod types;
 mod ui;

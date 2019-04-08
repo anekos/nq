@@ -5,8 +5,10 @@ use rusqlite:: Transaction;
 use rusqlite::types::ToSql;
 use serde_json::{Deserializer, Value, Map};
 
+use crate::db::TxExt;
 use crate::errors::{AppResult, AppResultU};
 use crate::sql;
+use crate::types::Type;
 use crate::ui;
 
 
@@ -18,7 +20,22 @@ const LINES_FOR_HEADER: usize = 100;
 type ObjMap = Map<String, Value>;
 
 
-pub fn header(content: &str) -> AppResult<Vec<String>> {
+pub struct Loader();
+
+
+impl super::Loader for Loader {
+    fn load(&self, tx: &Transaction, source: &str, _: &super::Config) -> AppResultU {
+        let header = header(&source)?;
+        let header: Vec<&str> = header.iter().map(|it| it.as_ref()).collect();
+        let types = Type::new(header.len());
+        tx.create_table(&types, header.as_slice())?;
+        insert_rows(&tx, &source)?;
+        Ok(())
+    }
+}
+
+
+fn header(content: &str) -> AppResult<Vec<String>> {
     let mut names = HashSet::<String>::new();
 
     let stream = Deserializer::from_str(content).into_iter::<Value>();
@@ -66,7 +83,7 @@ fn column_names(value: &Value) -> AppResult<Vec<String>> {
     Ok(result)
 }
 
-pub fn insert_rows(tx: &Transaction, content: &str) -> AppResultU {
+fn insert_rows(tx: &Transaction, content: &str) -> AppResultU {
     let stream = Deserializer::from_str(content).into_iter::<Value>();
 
     let mut p = ui::Progress::new();

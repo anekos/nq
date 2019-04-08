@@ -5,27 +5,35 @@ use regex::Regex;
 use rusqlite:: Transaction;
 use rusqlite::types::ToSql;
 
-use crate::errors::{AppResult, AppResultU};
+use crate::db::TxExt;
+use crate::errors::{AppError, AppResult, AppResultU};
+use crate::types::Type;
 use crate::ui;
 
 
 
-pub struct Reader {
-    pattern: Regex,
+pub struct Loader {
+    pub delimiter: Regex,
 }
 
 
-impl Reader {
-    pub fn new() -> AppResult<Reader> {
-        Ok(Reader { pattern: Regex::new(r"[ \t]+")? })
+impl super::Loader for Loader {
+    fn load(&self, tx: &Transaction, source: &str, _: &super::Config) -> AppResultU {
+        let header = self.header(&source)?;
+        let types = Type::new(header.len());
+        tx.create_table(&types, header.as_slice())?;
+        self.insert_rows(tx, header.len(), &source)?;
+        Ok(())
     }
+}
 
-    pub fn header<'a>(&self, rows: &'a str) -> Result<Vec<&'a str>, &'static str> {
-        let line = rows.lines().next().ok_or("No lines")?;
+impl Loader {
+    fn header<'a>(&self, rows: &'a str) -> AppResult<Vec<&'a str>> {
+        let line = rows.lines().next().ok_or(AppError::Fixed("No lines"))?;
         Ok(self.split(line, None))
     }
 
-    pub fn insert_rows(&self, tx: &Transaction, headers: usize, rows: &str) -> AppResultU {
+    fn insert_rows(&self, tx: &Transaction, headers: usize, rows: &str) -> AppResultU {
         let insert = {
             let mut insert = "INSERT INTO n VALUES(".to_owned();
             let mut first = true;
@@ -56,9 +64,10 @@ impl Reader {
 
     fn split<'a>(&self, s: &'a str, n: Option<usize>) -> Vec<&'a str> {
         if let Some(n) = n {
-            self.pattern.splitn(s, n).collect()
+            self.delimiter.splitn(s, n).collect()
         } else {
-            self.pattern.split(s).collect()
+            self.delimiter.split(s).collect()
         }
     }
+
 }

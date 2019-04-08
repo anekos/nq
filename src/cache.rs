@@ -5,20 +5,13 @@ use std::path::Path;
 
 use encoding::DecoderTrap;
 use encoding::label::encoding_from_whatwg_label;
-use rusqlite::{Transaction, Connection};
+use regex::Regex;
+use rusqlite::Connection;
 
-use crate::format;
-use crate::types::*;
 use crate::errors::{AppResult, AppResultU};
+use crate::loader::{Loader, self};
+use crate::types::*;
 
-
-
-const ALPHAS: &[&str] = &[
-    "a", "b", "c", "d", "e", "f", "g", "h", "i", "j", "k", "l", "m", "n", "o", "p",
-    "q", "r", "s", "t", "u", "v", "w", "x", "y", "z", "A", "B", "C", "D", "E", "F",
-    "G", "H", "I", "J", "K", "L", "M", "N", "O", "P", "Q", "R", "S", "T", "U", "V",
-    "W", "X", "Y", "Z"
-];
 
 
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -71,48 +64,21 @@ impl Cache {
         let mut conn = Connection::open(self)?;
         let tx = conn.transaction()?;
 
-        match format {
-            Format::Csv(delimiter) => {
-                let mut content = format::csv::open(&source, delimiter)?;
-                let header = content.nth(0).ok_or("Header not found")??;
-                let header = if no_headers {
-                    let columns = header.len();
-                    alpha_header(columns)
-                } else {
-                    let _ = content.next();
-                    header.columns()?.collect::<Vec<&str>>()
-                };
-                let mut types: Vec<Type> = vec![];
-                types.resize(header.len(), Type::Int);
-                if let Some(lines) = guess_lines {
-                    let mut content = format::csv::open(&source, delimiter)?;
-                    content.next().ok_or("No header")??;
-                    format::csv::guess_types(&mut types, lines, content)?
-                }
+        let config = loader::Config { no_headers, guess_lines };
 
-                create_table(&tx, &types, header.as_slice())?;
-                format::csv::insert_rows(&tx, header.len(), content, &types)?;
-            },
-            Format::Json => {
-                let header = format::json::header(&source)?;
-                let header: Vec<&str> = header.iter().map(|it| it.as_ref()).collect();
-                let types = Type::new(header.len());
-                create_table(&tx, &types, header.as_slice())?;
-                format::json::insert_rows(&tx, &source)?;
-            },
-            Format::Ltsv => {
-                let header = format::ltsv::header(&source)?;
-                let types = Type::new(header.len());
-                create_table(&tx, &types, header.as_slice())?;
-                format::ltsv::insert_rows(&tx, &source)?;
-            },
-            Format::Simple => {
-                let reader = format::simple::Reader::new()?;
-                let header = reader.header(&source)?;
-                let types = Type::new(header.len());
-                create_table(&tx, &types, header.as_slice())?;
-                reader.insert_rows(&tx, header.len(), &source)?;
-            },
+        let load = |loader: &Loader| {
+            loader.load(&tx, &source, &config)
+        };
+
+        match format {
+            Format::Csv(delimiter) =>
+                load(&loader::Csv { delimiter })?,
+            Format::Json =>
+                load(&loader::Json())?,
+            Format::Ltsv =>
+                load(&loader::Ltsv())?,
+            Format::Simple =>
+                load(&loader::Simple { delimiter: Regex::new(r"[ \t]+")? })?,
         }
 
         tx.commit()?;
@@ -173,38 +139,4 @@ fn read_file(input: &Input, encoding: &Option<String>) -> AppResult<String> {
     }
 
     Ok(buffer)
-}
-
-
-fn alpha_header(n: usize) -> Vec<&'static str> {
-    let mut result = vec![];
-    for alpha in ALPHAS.iter().take(n) {
-        result.push(*alpha);
-    }
-    result
-}
-
-fn create_table(tx: &Transaction, types: &[Type], header: &[&str]) -> AppResultU {
-    let mut create = "CREATE TABLE n (".to_owned();
-    let mut first = true;
-    for (i, name) in header.iter().enumerate() {
-        let name = name.replace("'", "''");
-        if first {
-            first = false;
-        } else {
-            create.push(',');
-        }
-        let t = match types[i] {
-            Type::Int => "integer",
-            Type::Real => "real",
-            Type::Text => "text",
-        };
-        create.push_str(&format!("'{}' {}", name, t));
-    }
-    create.push(')');
-
-    tx.execute("DROP TABLE IF EXISTS n", &[]).unwrap();
-    tx.execute(&create, &[])?;
-
-    Ok(())
 }

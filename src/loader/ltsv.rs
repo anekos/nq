@@ -4,12 +4,28 @@ use std::collections::HashSet;
 use rusqlite::types::ToSql;
 use rusqlite:: Transaction;
 
+use crate::db::TxExt;
 use crate::errors::{AppResult, AppResultU};
+use crate::types::Type;
 use crate::ui;
 
 
 
-pub fn header(content: &str) -> AppResult<Vec<&str>> {
+pub struct Loader();
+
+
+impl super::Loader for Loader {
+    fn load(&self, tx: &Transaction, source: &str, _: &super::Config) -> AppResultU {
+        let header = header(&source)?;
+        let types = Type::new(header.len());
+        tx.create_table(&types, header.as_slice())?;
+        insert_rows(&tx, &source)?;
+        Ok(())
+    }
+}
+
+
+fn header(content: &str) -> AppResult<Vec<&str>> {
     let mut names = HashSet::<&str>::new();
 
     for row in content.lines() {
@@ -29,7 +45,7 @@ pub fn header(content: &str) -> AppResult<Vec<&str>> {
     Ok(names.into_iter().collect())
 }
 
-pub fn insert_rows(tx: &Transaction, content: &str) -> AppResultU {
+fn insert_rows(tx: &Transaction, content: &str) -> AppResultU {
     let mut p = ui::Progress::new();
 
     for row in content.lines() {
