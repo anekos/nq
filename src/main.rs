@@ -13,6 +13,8 @@ use std::fs;
 use std::os::unix::process::CommandExt;
 use std::process::{exit, Command};
 
+use rusqlite::Connection;
+
 mod app_options;
 mod cache;
 mod db;
@@ -22,7 +24,7 @@ mod sql;
 mod types;
 mod ui;
 
-use cache::Cache;
+use cache::{Cache, Source};
 use errors::{AppResult, AppResultU};
 use types::*;
 
@@ -45,10 +47,15 @@ fn app() -> AppResultU {
     }
 
     let input = parse_input(&options.arg_csv);
-    let cache = make_sqlite(&input, &options.flag_c)?;
-    let cache_state = cache::State::get(&input, &cache)?;
+    let source = make_sqlite(&input, &options.flag_c)?;
 
-    if let Some(path) = cache.as_ref().to_str() {
+    let mut conn = Connection::open(source.as_ref())?;
+    let tx = conn.transaction()?;
+    let cache = Cache::new(&source, tx);
+
+    let cache_state = cache.state(&input)?;
+
+    if let Some(path) = source.as_ref().to_str() {
         eprintln!("cache: {}", path);
     }
 
@@ -57,14 +64,14 @@ fn app() -> AppResultU {
             Ok(_) => (),
             err => {
                 if cache_state == cache::State::Nothing {
-                    cache.remove_file()?;
+                    source.remove_file()?;
                 }
                 return err;
             }
         }
     }
 
-    exec_sqlite(&cache, &options.flag_q, &options.arg_sqlite_options);
+    exec_sqlite(&source, &options.flag_q, &options.arg_sqlite_options);
 
     Ok(())
 }
@@ -76,20 +83,20 @@ fn parse_input(filepath: &str) -> Input {
     }
 }
 
-fn make_sqlite(input: &Input, cache_filepath: &Option<String>) -> AppResult<Cache> {
+fn make_sqlite(input: &Input, cache_filepath: &Option<String>) -> AppResult<Source> {
     match *input {
-        Input::Stdin => Ok(Cache::Temp(mktemp::Temp::new_file()?)),
+        Input::Stdin => Ok(Source::Temp(mktemp::Temp::new_file()?)),
         Input::File(ref input_path) => {
             match *cache_filepath {
-                Some(ref path) => Ok(Cache::File(path.clone())),
+                Some(ref path) => Ok(Source::File(path.clone())),
                 None => {
                     let meta = fs::File::open(input_path)?.metadata()?;
                     if meta.is_file() {
                         let mut path = input_path.to_string();
                         path.push_str(".nq-cache.sqlite");
-                        Ok(Cache::File(path))
+                        Ok(Source::File(path))
                     } else {
-                        Ok(Cache::Temp(mktemp::Temp::new_file()?))
+                        Ok(Source::Temp(mktemp::Temp::new_file()?))
                     }
                 }
             }
@@ -97,10 +104,10 @@ fn make_sqlite(input: &Input, cache_filepath: &Option<String>) -> AppResult<Cach
     }
 }
 
-fn exec_sqlite(cache: &Cache, query: &Option<String>, options: &[String]) {
+fn exec_sqlite(source: &Source, query: &Option<String>, options: &[String]) {
     let cmd = env::var("NQ_SQLITE").unwrap_or_else(|_| "sqlite3".to_owned());
     let mut cmd = Command::new(cmd);
-    cmd.arg(cache.as_ref());
+    cmd.arg(source.as_ref());
     cmd.args(options);
     if let Some(ref query) = *query {
         cmd.arg(query);

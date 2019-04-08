@@ -6,7 +6,7 @@ use std::path::Path;
 use encoding::DecoderTrap;
 use encoding::label::encoding_from_whatwg_label;
 use regex::Regex;
-use rusqlite::Connection;
+use rusqlite::Transaction;
 
 use crate::errors::{AppResult, AppResultU};
 use crate::loader::{Loader, self};
@@ -21,19 +21,54 @@ pub enum State {
     Stale,
 }
 
-pub enum Cache {
+pub struct Cache<'a> {
+    source: &'a Source,
+    tx: Transaction<'a>,
+}
+
+pub enum Source {
     File(String),
     Temp(mktemp::Temp),
 }
 
 
-impl State {
-    pub fn get(input: &Input, cache: &Cache) -> AppResult<State> {
+impl<'a> Cache<'a> {
+    pub fn new(source: &'a Source, tx: Transaction<'a>) -> Self {
+        Self { source, tx }
+    }
+
+    pub fn refresh(self, format: Format, input: &Input, no_headers: bool, guess_lines: Option<usize>, encoding: &Option<String>) -> AppResultU {
+        let source = read_file(input, encoding)?;
+
+        let config = loader::Config { no_headers, guess_lines };
+
+        let load = |loader: &Loader| {
+            loader.load(&self.tx, &source, &config)
+        };
+
+        match format {
+            Format::Csv(delimiter) =>
+                load(&loader::Csv { delimiter })?,
+            Format::Json =>
+                load(&loader::Json())?,
+            Format::Ltsv =>
+                load(&loader::Ltsv())?,
+            Format::Regex(ref format) =>
+                load(&loader::Regex { format: Regex::new(format)? })?,
+            Format::Simple =>
+                load(&loader::Simple { delimiter: Regex::new(r"[ \t]+")? })?,
+        }
+
+        self.tx.commit()?;
+        Ok(())
+    }
+
+    pub fn state(&self, input: &Input) -> AppResult<State> {
         match *input {
             Input::Stdin => Ok(State::Nothing),
             Input::File(input_filepath) => {
-                match *cache {
-                    Cache::File(ref cache_filepath) => {
+                match self.source {
+                    Source::File(ref cache_filepath) => {
                         if !Path::new(cache_filepath).exists() {
                             return Ok(State::Nothing)
                         }
@@ -50,45 +85,19 @@ impl State {
             }
         }
     }
+}
 
+
+impl State {
     pub fn is_fresh(self) -> bool {
         self == State::Fresh
     }
 }
 
 
-impl Cache {
-    pub fn refresh(&self, format: Format, input: &Input, no_headers: bool, guess_lines: Option<usize>, encoding: &Option<String>) -> AppResultU {
-        let source = read_file(input, encoding)?;
-
-        let mut conn = Connection::open(self)?;
-        let tx = conn.transaction()?;
-
-        let config = loader::Config { no_headers, guess_lines };
-
-        let load = |loader: &Loader| {
-            loader.load(&tx, &source, &config)
-        };
-
-        match format {
-            Format::Csv(delimiter) =>
-                load(&loader::Csv { delimiter })?,
-            Format::Json =>
-                load(&loader::Json())?,
-            Format::Ltsv =>
-                load(&loader::Ltsv())?,
-            Format::Regex(ref format) =>
-                load(&loader::Regex { format: Regex::new(format)? })?,
-            Format::Simple =>
-                load(&loader::Simple { delimiter: Regex::new(r"[ \t]+")? })?,
-        }
-
-        tx.commit()?;
-        Ok(())
-    }
-
+impl Source {
     pub fn remove_file(&self) -> AppResultU {
-        use Cache::*;
+        use Source::*;
 
         match *self {
             File(ref path) => remove_file(path)?,
@@ -99,11 +108,11 @@ impl Cache {
     }
 }
 
-impl AsRef<Path> for Cache {
+impl AsRef<Path> for Source {
     fn as_ref(&self) -> &Path {
         match *self {
-            Cache::File(ref path) => Path::new(path),
-            Cache::Temp(ref path) => path.as_ref(),
+            Source::File(ref path) => Path::new(path),
+            Source::Temp(ref path) => path.as_ref(),
         }
     }
 }
