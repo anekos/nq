@@ -18,8 +18,8 @@ pub struct Loader {
 
 
 impl super::Loader for Loader {
-    fn load(&self, tx: &Transaction, source: &str, _: &super::Config) -> AppResultU {
-        let header = self.header(&source)?;
+    fn load(&self, tx: &Transaction, source: &str, config: &super::Config) -> AppResultU {
+        let header = self.header(&source, config.no_headers)?;
         let types = Type::new(header.len());
         tx.create_table(&types, header.as_slice())?;
         self.insert_rows(tx, header.len(), &source)?;
@@ -28,9 +28,14 @@ impl super::Loader for Loader {
 }
 
 impl Loader {
-    fn header<'a>(&self, rows: &'a str) -> AppResult<Vec<&'a str>> {
+    fn header<'a>(&self, rows: &'a str, no_header: bool) -> AppResult<Vec<&'a str>> {
         let line = rows.lines().next().ok_or(AppError::Fixed("No lines"))?;
-        Ok(self.split(line, None))
+        let columns = self.split(line, None);
+        if no_header {
+            Ok(super::alpha_header(columns.len()))
+        } else {
+            Ok(columns)
+        }
     }
 
     fn insert_rows(&self, tx: &Transaction, headers: usize, rows: &str) -> AppResultU {
