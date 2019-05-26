@@ -1,4 +1,6 @@
 
+use std::convert::AsRef;
+
 use rusqlite::{NO_PARAMS, Transaction};
 
 use crate::errors::AppResultU;
@@ -7,15 +9,15 @@ use crate::types::Type;
 
 
 pub trait TxExt {
-    fn create_table(&self, types: &[Type], header: &[&str]) -> AppResultU;
+    fn create_table<T: AsRef<str>>(&self, types: &[Type], header: &[T]) -> AppResultU;
 }
 
 impl<'a> TxExt for Transaction<'a> {
-    fn create_table(&self, types: &[Type], header: &[&str]) -> AppResultU {
+    fn create_table<T: AsRef<str>>(&self, types: &[Type], header: &[T]) -> AppResultU {
         let mut create = "CREATE TABLE n (".to_owned();
         let mut first = true;
         for (i, name) in header.iter().enumerate() {
-            let name = name.replace("'", "''");
+            let name = name.as_ref().replace("'", "''");
             if first {
                 first = false;
             } else {

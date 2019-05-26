@@ -1,4 +1,6 @@
 
+use std::io::{BufRead, Seek};
+
 use regex::Regex;
 use rusqlite:: Transaction;
 use rusqlite::types::ToSql;
@@ -16,23 +18,25 @@ pub struct Loader {
 
 
 impl super::Loader for Loader {
-    fn load(&self, tx: &Transaction, source: &str, _: &super::Config) -> AppResultU {
-        self.insert_rows(tx, &source)?;
+    fn load<T: BufRead + Seek>(&self, tx: &Transaction, source: &mut T, _: &super::Config) -> AppResultU {
+        self.insert_rows(tx, source)?;
         Ok(())
     }
 }
 
 impl Loader {
-    fn insert_rows(&self, tx: &Transaction, content: &str) -> AppResultU {
+    fn insert_rows<T: BufRead + Seek>(&self, tx: &Transaction, content: &mut T) -> AppResultU {
         let mut p = ui::Progress::new();
 
         let mut header = None;
         let mut insert = None;
 
         for row in content.lines() {
+            let row = row?;
+
             p.progress();
 
-            if let Some(matches) = self.format.captures(row) {
+            if let Some(matches) = self.format.captures(&row) {
                 if header.is_none() {
                     let h = super::alpha_header(matches.len() - 1);
                     let types = Type::new(h.len());

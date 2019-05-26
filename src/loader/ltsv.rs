@@ -1,5 +1,6 @@
 
 use std::collections::HashSet;
+use std::io::{BufRead, Seek};
 
 use rusqlite::types::ToSql;
 use rusqlite:: Transaction;
@@ -15,20 +16,21 @@ pub struct Loader();
 
 
 impl super::Loader for Loader {
-    fn load(&self, tx: &Transaction, source: &str, _: &super::Config) -> AppResultU {
-        let header = header(&source)?;
+    fn load<T: BufRead + Seek>(&self, tx: &Transaction, source: &mut T, _: &super::Config) -> AppResultU {
+        let header = header(source)?;
         let types = Type::new(header.len());
         tx.create_table(&types, header.as_slice())?;
-        insert_rows(&tx, &source)?;
+        insert_rows(&tx, source)?;
         Ok(())
     }
 }
 
 
-fn header(content: &str) -> AppResult<Vec<&str>> {
-    let mut names = HashSet::<&str>::new();
+fn header<T: BufRead + Seek>(content: &mut T) -> AppResult<Vec<String>> {
+    let mut names = HashSet::<String>::new();
 
     for row in content.lines() {
+        let row = row?;
         for column in row.split('\t') {
             if let Some(idx) = column.find(':') {
                 if idx == 0 {
@@ -36,7 +38,7 @@ fn header(content: &str) -> AppResult<Vec<&str>> {
                 }
                 let (name, _) = column.split_at(idx);
                 if !names.contains(name) {
-                    names.insert(name);
+                    names.insert(name.to_owned());
                 }
             }
         }
@@ -45,10 +47,12 @@ fn header(content: &str) -> AppResult<Vec<&str>> {
     Ok(names.into_iter().collect())
 }
 
-fn insert_rows(tx: &Transaction, content: &str) -> AppResultU {
+fn insert_rows<T: BufRead + Seek>(tx: &Transaction, content: &mut T) -> AppResultU {
     let mut p = ui::Progress::new();
 
     for row in content.lines() {
+        let row = row?;
+
         p.progress();
 
         let mut names = String::new();

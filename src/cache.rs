@@ -1,6 +1,6 @@
 
 use std::fs::{File, metadata, remove_file};
-use std::io::{self, Read};
+use std::io::{BufReader, Cursor, Read, self};
 use std::path::Path;
 
 use encoding::DecoderTrap;
@@ -57,24 +57,29 @@ impl<'a> Cache<'a> {
     }
 
     pub fn refresh(self, format: &Format, input: &Input, config: &Config, encoding: &Option<String>) -> AppResultU {
-        let source = read_file(input, encoding)?;
+        // let source = read_file(input, encoding)?;
 
-        let load = |loader: &Loader| {
-            loader.load(&self.tx, &source, config)
-        };
+        if let Input::File(path) = input {
+            let file = File::open(path)?;
+            let mut file = std::io::BufReader::new(file);
+            loader::Json().load(&self.tx, &mut file, config)?;
+        } else {
+            panic!("Ooops");
+        }
 
         match format {
             Format::Csv(delimiter) =>
-                load(&loader::Csv { delimiter: *delimiter })?,
+                read_file(input, encoding, &self.tx, config, &loader::Csv { delimiter: *delimiter })?,
             Format::Json =>
-                load(&loader::Json())?,
+                read_file(input, encoding, &self.tx, config, &loader::Json())?,
             Format::Ltsv =>
-                load(&loader::Ltsv())?,
+                read_file(input, encoding, &self.tx, config, &loader::Ltsv())?,
             Format::Regex(ref format) =>
-                load(&loader::Regex { format: Regex::new(format)? })?,
+                read_file(input, encoding, &self.tx, config, &loader::Regex { format: Regex::new(format)? })?,
             Format::Simple =>
-                load(&loader::Simple { delimiter: Regex::new(r"[ \t]+")? })?,
-        }
+                read_file(input, encoding, &self.tx, config, &loader::Simple { delimiter: Regex::new(r"[ \t]+")? })?,
+        };
+
 
         if let Source::File(_) = self.source {
             let updated = self.tx.execute("UPDATE meta SET value = ? WHERE name = 'format';", &[&format.to_string()])?;
@@ -146,30 +151,30 @@ impl AsRef<Path> for Source {
 }
 
 
-fn read_file(input: &Input, encoding: &Option<String>) -> AppResult<String> {
+fn read_file<L: Loader>(input: &Input, encoding: &Option<String>, tx: &Transaction, config: &Config, loader: &L) -> AppResultU {
+
     let mut buffer = String::new();
 
     if let Some(ref encoding) = *encoding {
         let encoding = encoding_from_whatwg_label(encoding).ok_or("Invalid encoding name")?;
-        let mut bin: Vec<u8> = vec![];
         match *input {
             Input::File(ref input_filepath) => {
                 let mut file = File::open(input_filepath)?;
-                file.read_to_end(&mut bin)?;
+                file.read_to_string(&mut buffer)?;
             },
             Input::Stdin => {
+                let mut bin: Vec<u8> = vec![];
                 io::stdin().read_to_end(&mut bin)?;
-            }
+                buffer = encoding.decode(&bin, DecoderTrap::Replace).unwrap_or_else(|it| it.into());
+            },
         }
-        buffer = match encoding.decode(&bin, DecoderTrap::Replace) {
-            Ok(s) => s,
-            Err(s) => s.to_string(),
-        };
     } else {
         match *input {
             Input::File(input_filepath) => {
-                let mut file = File::open(input_filepath)?;
-                file.read_to_string(&mut buffer)?;
+                let file = File::open(input_filepath)?;
+                let mut file = BufReader::new(file);
+                loader.load(tx, &mut file, config)?;
+                return Ok(());
             },
             Input::Stdin => {
                 io::stdin().read_to_string(&mut buffer)?;
@@ -177,5 +182,8 @@ fn read_file(input: &Input, encoding: &Option<String>) -> AppResult<String> {
         }
     }
 
-    Ok(buffer)
+    let mut buffer = Cursor::new(buffer);
+    loader.load(tx, &mut buffer, config)?;
+
+    Ok(())
 }

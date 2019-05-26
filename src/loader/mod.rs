@@ -1,4 +1,6 @@
 
+use std::io::{BufRead, Seek};
+
 use rusqlite::Transaction;
 
 use crate::errors::AppResultU;
@@ -23,7 +25,7 @@ pub struct Config {
 }
 
 pub trait Loader {
-    fn load(&self, tx: &Transaction, source: &str, config: &Config) -> AppResultU;
+    fn load<T: BufRead + Seek>(&self, tx: &Transaction, source: &mut T, config: &Config) -> AppResultU;
 }
 
 

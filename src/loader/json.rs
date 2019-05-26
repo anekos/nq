@@ -1,6 +1,7 @@
 
 use std::collections::HashSet;
 use std::convert::AsRef;
+use std::io::{BufRead, Seek};
 
 use rusqlite:: Transaction;
 use rusqlite::types::ToSql;
@@ -24,21 +25,21 @@ pub struct Loader();
 
 
 impl super::Loader for Loader {
-    fn load(&self, tx: &Transaction, source: &str, config: &super::Config) -> AppResultU {
-        let header = header(&source, config.guess_lines.unwrap_or(100))?;
+    fn load<T: BufRead + Seek>(&self, tx: &Transaction, source: &mut T, config: &super::Config) -> AppResultU {
+        let header = header(source, config.guess_lines.unwrap_or(100))?;
         let header: Vec<&str> = header.iter().map(AsRef::as_ref).collect();
         let types = Type::new(header.len());
         tx.create_table(&types, header.as_slice())?;
-        insert_rows(&tx, &source)?;
+        insert_rows(&tx, source)?;
         Ok(())
     }
 }
 
 
-fn header(content: &str, guess_lines: usize) -> AppResult<Vec<String>> {
+fn header<T: BufRead + Seek>(content: &mut T, guess_lines: usize) -> AppResult<Vec<String>> {
     let mut names = HashSet::<String>::new();
 
-    let stream = Deserializer::from_str(content).into_iter::<Value>();
+    let stream = Deserializer::from_reader(content).into_iter::<Value>();
     let mut p = ui::Progress::new();
 
     for it in stream {
@@ -83,8 +84,8 @@ fn column_names(value: &Value) -> AppResult<Vec<String>> {
     Ok(result)
 }
 
-fn insert_rows(tx: &Transaction, content: &str) -> AppResultU {
-    let stream = Deserializer::from_str(content).into_iter::<Value>();
+fn insert_rows<T: BufRead + Seek>(tx: &Transaction, content: &mut T) -> AppResultU {
+    let stream = Deserializer::from_reader(content).into_iter::<Value>();
 
     let mut p = ui::Progress::new();
     for it in stream {

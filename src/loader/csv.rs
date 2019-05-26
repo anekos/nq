@@ -1,4 +1,6 @@
 
+use std::io::{BufRead, Seek};
+
 use quick_csv::Csv;
 use regex::Regex;
 use rusqlite:: Transaction;
@@ -17,32 +19,39 @@ pub struct Loader {
 
 
 impl super::Loader for Loader {
-    fn load(&self, tx: &Transaction, source: &str, config: &super::Config) -> AppResultU {
-        let mut content = open(&source, self.delimiter)?;
+    fn load<T: BufRead + Seek>(&self, tx: &Transaction, source: &mut T, config: &super::Config) -> AppResultU {
+        let mut content = open(source, self.delimiter)?;
         let header = content.nth(0).ok_or("Header not found")??;
-        let header = if config.no_header {
-            let columns = header.len();
-            super::alpha_header(columns)
-        } else {
-            let _ = content.next();
-            header.columns()?.collect::<Vec<&str>>()
+
+        let header = {
+            if config.no_header {
+                let columns = header.len();
+                super::alpha_header(columns)
+            } else {
+                let _ = content.next();
+                header.columns()?.collect::<Vec<&str>>()
+            }
         };
+
         let mut types: Vec<Type> = vec![];
         types.resize(header.len(), Type::Int);
         if let Some(lines) = config.guess_lines {
-            let mut content = open(&source, self.delimiter)?;
+            let mut content = open(source, self.delimiter)?;
             content.next().ok_or("No header")??;
             guess_types(&mut types, lines, content)?
         }
 
         tx.create_table(&types, header.as_slice())?;
+
+        let content = open(source, self.delimiter)?;
         insert_rows(&tx, header.len(), content, &types)?;
+
         Ok(())
     }
 }
 
 
-fn guess_types(types: &mut Vec<Type>, lines: usize, rows: Csv<&[u8]>) -> AppResultU {
+fn guess_types<T: BufRead + Seek>(types: &mut Vec<Type>, lines: usize, rows: Csv<&mut T>) -> AppResultU {
     if 0 == lines {
         return Ok(());
     }
@@ -68,7 +77,7 @@ fn guess_types(types: &mut Vec<Type>, lines: usize, rows: Csv<&[u8]>) -> AppResu
     Ok(())
 }
 
-fn insert_rows(tx: &Transaction, headers: usize, rows: Csv<&[u8]>, types: &[Type]) -> AppResultU {
+fn insert_rows<T: BufRead + Seek>(tx: &Transaction, headers: usize, rows: Csv<&mut T>, types: &[Type]) -> AppResultU {
     let insert = {
         let mut insert = "INSERT INTO n VALUES(".to_owned();
         let mut first = true;
@@ -109,8 +118,8 @@ fn insert_rows(tx: &Transaction, headers: usize, rows: Csv<&[u8]>, types: &[Type
     Ok(())
 }
 
-fn open<'a>(csv_text: &'a str, delimiter: Option<u8>) -> AppResult<Csv<&'a [u8]>> {
-    let mut csv = quick_csv::Csv::from_string(csv_text);
+fn open<'a, T: BufRead + Seek>(csv_text: &'a mut T, delimiter: Option<u8>) -> AppResult<Csv<&'a mut T>> {
+    let mut csv = quick_csv::Csv::from_reader(csv_text);
     if let Some(delimiter) = delimiter {
         csv = csv.delimiter(delimiter);
     }

@@ -1,4 +1,6 @@
 
+use std::io::{BufRead, Seek};
+
 extern crate quick_csv;
 
 use regex::Regex;
@@ -18,27 +20,30 @@ pub struct Loader {
 
 
 impl super::Loader for Loader {
-    fn load(&self, tx: &Transaction, source: &str, config: &super::Config) -> AppResultU {
-        let header = self.header(&source, config.no_header)?;
+    fn load<T: BufRead + Seek>(&self, tx: &Transaction, source: &mut T, config: &super::Config) -> AppResultU {
+        let header = self.header(source, config.no_header)?;
         let types = Type::new(header.len());
         tx.create_table(&types, header.as_slice())?;
-        self.insert_rows(tx, header.len(), &source)?;
+        self.insert_rows(tx, header.len(), source)?;
         Ok(())
     }
 }
 
 impl Loader {
-    fn header<'a>(&self, rows: &'a str, no_header: bool) -> AppResult<Vec<&'a str>> {
+    fn header<T: BufRead + Seek>(&self, rows: &mut T, no_header: bool) -> AppResult<Vec<String>> {
         let line = rows.lines().next().ok_or(AppError::Fixed("No lines"))?;
-        let columns = self.split(line, None);
-        if no_header {
-            Ok(super::alpha_header(columns.len()))
+        let line = line?;
+        let columns = self.split(&line, None);
+        let result = if no_header {
+            super::alpha_header(columns.len())
         } else {
-            Ok(columns)
-        }
+            columns
+        };
+        let result = result.into_iter().map(|it| it.to_owned()).collect();
+        Ok(result)
     }
 
-    fn insert_rows(&self, tx: &Transaction, headers: usize, rows: &str) -> AppResultU {
+    fn insert_rows<T: BufRead + Seek>(&self, tx: &Transaction, headers: usize, rows: &mut T) -> AppResultU {
         let insert = {
             let mut insert = "INSERT INTO n VALUES(".to_owned();
             let mut first = true;
@@ -57,8 +62,9 @@ impl Loader {
         let mut p = ui::Progress::new();
         let mut stmt = tx.prepare(&insert)?;
         for row in rows.lines().skip(1) {
+            let row = row?;
             p.progress();
-            let row: Vec<&str> = self.split(row, Some(headers));
+            let row: Vec<&str> = self.split(&row, Some(headers));
             let row: Vec<&ToSql> = row.iter().map(|it| it as &ToSql).collect();
             stmt.execute(row.as_slice())?;
         }
