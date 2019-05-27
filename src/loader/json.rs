@@ -1,5 +1,6 @@
 
 use std::collections::HashSet;
+use std::convert::AsRef;
 
 use rusqlite:: Transaction;
 use rusqlite::types::ToSql;
@@ -25,7 +26,7 @@ pub struct Loader();
 impl super::Loader for Loader {
     fn load(&self, tx: &Transaction, source: &str, config: &super::Config) -> AppResultU {
         let header = header(&source, config.guess_lines.unwrap_or(100))?;
-        let header: Vec<&str> = header.iter().map(|it| it.as_ref()).collect();
+        let header: Vec<&str> = header.iter().map(AsRef::as_ref).collect();
         let types = Type::new(header.len());
         tx.create_table(&types, header.as_slice())?;
         insert_rows(&tx, &source)?;

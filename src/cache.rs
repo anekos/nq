@@ -6,7 +6,7 @@ use std::path::Path;
 use encoding::DecoderTrap;
 use encoding::label::encoding_from_whatwg_label;
 use regex::Regex;
-use rusqlite::Transaction;
+use rusqlite::{NO_PARAMS, Transaction};
 
 use crate::errors::{AppError, AppResult, AppResultU};
 use crate::loader::{Config, Loader, self};
@@ -34,14 +34,14 @@ pub enum Source {
 
 impl<'a> Cache<'a> {
     pub fn format(&self) -> AppResult<String> {
-        let meta: u32 = self.tx.query_row("SELECT COUNT(*) FROM sqlite_master WHERE type = 'table' AND name = 'meta'", &[], |row| row.get(0))?;
+        let meta: u32 = self.tx.query_row("SELECT COUNT(*) FROM sqlite_master WHERE type = 'table' AND name = 'meta'", NO_PARAMS, |row| row.get(0))?;
         match meta {
             0 => {
-                self.tx.execute("CREATE TABLE meta (name TEXT PRIMARY KEY, value TEXT);", &[])?;
+                self.tx.execute("CREATE TABLE meta (name TEXT PRIMARY KEY, value TEXT);", NO_PARAMS)?;
                 Ok("".to_owned())
             },
             1 => {
-                let result = self.tx.query_row("SELECT value FROM meta WHERE name = 'format'", &[], |row| row.get(0));
+                let result = self.tx.query_row("SELECT value FROM meta WHERE name = 'format'", NO_PARAMS, |row| row.get(0));
                 match result {
                     Ok(format) => Ok(format),
                     Err(rusqlite::Error::QueryReturnedNoRows) => Ok("".to_owned()),

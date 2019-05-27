@@ -1,5 +1,5 @@
 
-use rusqlite::Transaction;
+use rusqlite::{NO_PARAMS, Transaction};
 
 use crate::errors::AppResultU;
 use crate::types::Type;
@@ -30,8 +30,8 @@ impl<'a> TxExt for Transaction<'a> {
         }
         create.push(')');
 
-        self.execute("DROP TABLE IF EXISTS n", &[]).unwrap();
-        self.execute(&create, &[])?;
+        self.execute("DROP TABLE IF EXISTS n", NO_PARAMS).unwrap();
+        self.execute(&create, NO_PARAMS)?;
 
         Ok(())
     }
