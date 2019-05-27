@@ -14,7 +14,6 @@ use crate::ui;
 
 
 const NAME_DELIMITER: char =  '_';
-const LINES_FOR_HEADER: usize = 100;
 
 
 type ObjMap = Map<String, Value>;
@@ -24,8 +23,8 @@ pub struct Loader();
 
 
 impl super::Loader for Loader {
-    fn load(&self, tx: &Transaction, source: &str, _: &super::Config) -> AppResultU {
-        let header = header(&source)?;
+    fn load(&self, tx: &Transaction, source: &str, config: &super::Config) -> AppResultU {
+        let header = header(&source, config.guess_lines.unwrap_or(100))?;
         let header: Vec<&str> = header.iter().map(|it| it.as_ref()).collect();
         let types = Type::new(header.len());
         tx.create_table(&types, header.as_slice())?;
@@ -35,14 +34,14 @@ impl super::Loader for Loader {
 }
 
 
-fn header(content: &str) -> AppResult<Vec<String>> {
+fn header(content: &str, guess_lines: usize) -> AppResult<Vec<String>> {
     let mut names = HashSet::<String>::new();
 
     let stream = Deserializer::from_str(content).into_iter::<Value>();
     let mut p = ui::Progress::new();
 
     for it in stream {
-        if LINES_FOR_HEADER < p.n {
+        if guess_lines < p.n {
             break;
         }
         p.progress();
