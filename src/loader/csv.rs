@@ -1,4 +1,5 @@
 
+use std::borrow::ToOwned;
 use std::io::{BufRead, Seek, SeekFrom};
 
 use quick_csv::Csv;
@@ -20,26 +21,29 @@ pub struct Loader {
 
 impl super::Loader for Loader {
     fn load<T: BufRead + Seek>(&self, tx: &Transaction, source: &mut T, config: &super::Config) -> AppResultU {
-        let mut content = open(source, self.delimiter)?;
-        let header = content.nth(0).ok_or("Header not found")??;
+        let header: Vec<String> = {
+            let mut content = open(source, self.delimiter)?;
+            let header = content.next().ok_or("Header not found")??;
 
-        let header = {
-            if config.no_header {
-                let columns = header.len();
-                super::alpha_header(columns)
-            } else {
-                let _ = content.next();
-                header.columns()?.collect::<Vec<&str>>()
-            }
+            let header = {
+                if config.no_header {
+                    let columns = header.len();
+                    super::alpha_header(columns)
+                } else {
+                    header.columns()?.collect::<Vec<&str>>()
+                }
+            };
+            header.into_iter().map(ToOwned::to_owned).collect()
         };
+        let content_offset = source.seek(SeekFrom::Current(0))?;
 
         let mut types: Vec<Type> = vec![];
         types.resize(header.len(), Type::Int);
         if let Some(lines) = config.guess_lines {
-            let mut content = open(source, self.delimiter)?;
-            content.next().ok_or("No header")??;
+            let content = open(source, self.delimiter)?;
             guess_types(&mut types, lines, content)?
         }
+        source.seek(SeekFrom::Start(content_offset))?;
 
         tx.create_table(&types, header.as_slice())?;
 
