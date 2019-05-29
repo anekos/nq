@@ -1,6 +1,6 @@
 
 use std::borrow::ToOwned;
-use std::io::{BufRead, Seek};
+use std::io::{BufRead, Seek, SeekFrom};
 
 extern crate quick_csv;
 
@@ -23,6 +23,7 @@ pub struct Loader {
 impl super::Loader for Loader {
     fn load<T: BufRead + Seek>(&self, tx: &Transaction, source: &mut T, config: &super::Config) -> AppResultU {
         let header = self.header(source, config.no_header)?;
+        source.seek(SeekFrom::Start(0))?;
         let types = Type::new(header.len());
         tx.create_table(&types, header.as_slice())?;
         self.insert_rows(tx, header.len(), source)?;

@@ -1,5 +1,5 @@
 
-use std::io::{BufRead, Seek};
+use std::io::{BufRead, Seek, SeekFrom};
 
 use quick_csv::Csv;
 use regex::Regex;

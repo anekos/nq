@@ -1,6 +1,6 @@
 
 use std::collections::HashSet;
-use std::io::{BufRead, Seek};
+use std::io::{BufRead, Seek, SeekFrom};
 
 use rusqlite::types::ToSql;
 use rusqlite:: Transaction;
@@ -18,6 +18,7 @@ pub struct Loader();
 impl super::Loader for Loader {
     fn load<T: BufRead + Seek>(&self, tx: &Transaction, source: &mut T, _: &super::Config) -> AppResultU {
         let header = header(source)?;
+        source.seek(SeekFrom::Start(0))?;
         let types = Type::new(header.len());
         tx.create_table(&types, header.as_slice())?;
         insert_rows(&tx, source)?;
