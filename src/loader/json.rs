@@ -1,7 +1,7 @@
 
 use std::collections::HashSet;
 use std::convert::AsRef;
-use std::io::{BufRead, Seek};
+use std::io::{BufRead, Seek, SeekFrom};
 
 use rusqlite:: Transaction;
 use rusqlite::types::ToSql;
@@ -27,6 +27,7 @@ pub struct Loader();
 impl super::Loader for Loader {
     fn load<T: BufRead + Seek>(&self, tx: &Transaction, source: &mut T, config: &super::Config) -> AppResultU {
         let header = header(source, config.guess_lines.unwrap_or(100))?;
+        source.seek(SeekFrom::Start(0))?;
         let header: Vec<&str> = header.iter().map(AsRef::as_ref).collect();
         let types = Type::new(header.len());
         tx.create_table(&types, header.as_slice())?;

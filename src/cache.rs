@@ -1,4 +1,5 @@
 
+use std::convert::Into;
 use std::fs::{File, metadata, remove_file};
 use std::io::{BufReader, Cursor, Read, self};
 use std::path::Path;
@@ -165,7 +166,7 @@ fn read_file<L: Loader>(input: &Input, encoding: &Option<String>, tx: &Transacti
             Input::Stdin => {
                 let mut bin: Vec<u8> = vec![];
                 io::stdin().read_to_end(&mut bin)?;
-                buffer = encoding.decode(&bin, DecoderTrap::Replace).unwrap_or_else(|it| it.into());
+                buffer = encoding.decode(&bin, DecoderTrap::Replace).unwrap_or_else(Into::into);
             },
         }
     } else {

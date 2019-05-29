@@ -1,4 +1,5 @@
 
+use std::borrow::ToOwned;
 use std::io::{BufRead, Seek};
 
 extern crate quick_csv;
@@ -39,7 +40,7 @@ impl Loader {
         } else {
             columns
         };
-        let result = result.into_iter().map(|it| it.to_owned()).collect();
+        let result = result.into_iter().map(ToOwned::to_owned).collect();
         Ok(result)
     }
 
