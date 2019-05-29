@@ -60,14 +60,6 @@ impl<'a> Cache<'a> {
     pub fn refresh(self, format: &Format, input: &Input, config: &Config, encoding: &Option<String>) -> AppResultU {
         // let source = read_file(input, encoding)?;
 
-        if let Input::File(path) = input {
-            let file = File::open(path)?;
-            let mut file = std::io::BufReader::new(file);
-            loader::Json().load(&self.tx, &mut file, config)?;
-        } else {
-            panic!("Ooops");
-        }
-
         match format {
             Format::Csv(delimiter) =>
                 read_file(input, encoding, &self.tx, config, &loader::Csv { delimiter: *delimiter })?,
