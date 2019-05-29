@@ -44,7 +44,7 @@ fn header<T: BufRead + Seek>(content: &mut T, guess_lines: usize) -> AppResult<V
     let mut p = ui::Progress::new();
 
     for it in stream {
-        if guess_lines < p.n {
+        if guess_lines <= p.n {
             break;
         }
         p.progress();
