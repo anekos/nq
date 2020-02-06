@@ -26,7 +26,7 @@ pub enum Input<'a> {
 
 
 impl Format {
-    pub fn to_string(&self) -> String {
+    pub fn to_sql_literal(&self) -> String {
         format!("{:?}", self)
     }
 }

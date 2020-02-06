@@ -101,7 +101,7 @@ fn insert_rows(tx: &Transaction, headers: usize, rows: Csv<&[u8]>, types: &[Type
                 it.to_owned()
             }
         }).collect();
-        let row: Vec<&ToSql> = row.iter().map(|it| it as &ToSql).collect();
+        let row: Vec<&dyn ToSql> = row.iter().map(|it| it as &dyn ToSql).collect();
         stmt.execute(row.as_slice())?;
     }
     p.complete();

@@ -94,7 +94,7 @@ fn make_sqlite(input: &Input, cache_filepath: &Option<String>) -> AppResult<Sour
                 None => {
                     let meta = fs::File::open(input_path)?.metadata()?;
                     if meta.is_file() {
-                        let mut path = input_path.to_string();
+                        let mut path = (*input_path).to_string();
                         path.push_str(".nq-cache.sqlite");
                         Ok(Source::File(path))
                     } else {

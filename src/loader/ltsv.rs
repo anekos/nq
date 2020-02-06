@@ -77,7 +77,7 @@ fn insert_rows(tx: &Transaction, content: &str) -> AppResultU {
         }
 
         let q = format!("INSERT INTO n ({}) VALUES ({})", names, values);
-        let args: Vec<&ToSql> = args.iter().map(|it| it as &ToSql).collect();
+        let args: Vec<&dyn ToSql> = args.iter().map(|it| it as &dyn ToSql).collect();
         tx.execute(&q, &args)?;
     }
 

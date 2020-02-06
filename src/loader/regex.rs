@@ -45,7 +45,7 @@ impl Loader {
                 for i in 1 ..= header.as_ref().expect("BUG").len() {
                     values.push(matches.get(i).ok_or(AppError::FewColumns)?.as_str());
                 }
-                let args: Vec<&ToSql> = values.iter().map(|it| it as &ToSql).collect();
+                let args: Vec<&dyn ToSql> = values.iter().map(|it| it as &dyn ToSql).collect();
                 tx.execute(insert.as_ref().expect("BUG"), &args)?;
             } else {
                 eprintln!("Skip: {}", row);

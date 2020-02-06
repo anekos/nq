@@ -59,7 +59,7 @@ impl Loader {
         for row in rows.lines().skip(1) {
             p.progress();
             let row: Vec<&str> = self.split(row, Some(headers));
-            let row: Vec<&ToSql> = row.iter().map(|it| it as &ToSql).collect();
+            let row: Vec<&dyn ToSql> = row.iter().map(|it| it as &dyn ToSql).collect();
             stmt.execute(row.as_slice())?;
         }
         p.complete();

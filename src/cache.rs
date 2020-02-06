@@ -59,7 +59,7 @@ impl<'a> Cache<'a> {
     pub fn refresh(self, format: &Format, input: &Input, config: &Config, encoding: &Option<String>) -> AppResultU {
         let source = read_file(input, encoding)?;
 
-        let load = |loader: &Loader| {
+        let load = |loader: &dyn Loader| {
             loader.load(&self.tx, &source, config)
         };
 
@@ -77,10 +77,10 @@ impl<'a> Cache<'a> {
         }
 
         if let Source::File(_) = self.source {
-            let updated = self.tx.execute("UPDATE meta SET value = ? WHERE name = 'format';", &[&format.to_string()])?;
+            let updated = self.tx.execute("UPDATE meta SET value = ? WHERE name = 'format';", &[&format.to_sql_literal()])?;
             match updated {
                 0 => {
-                    self.tx.execute("INSERT INTO meta VALUES('format', ?);", &[&format.to_string()])?;
+                    self.tx.execute("INSERT INTO meta VALUES('format', ?);", &[&format.to_sql_literal()])?;
                 },
                 1 => (),
                 n => panic!("UPDATE has returned: {}", n),
@@ -102,7 +102,7 @@ impl<'a> Cache<'a> {
                         }
                         let input = metadata(input_filepath)?.modified()?;
                         let cache = metadata(cache_filepath)?.modified()?;
-                        Ok(if input < cache && format.to_string() == self.format()? {
+                        Ok(if input < cache && format.to_sql_literal() == self.format()? {
                             State::Fresh
                         } else {
                             State::Stale
