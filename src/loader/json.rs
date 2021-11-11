@@ -139,7 +139,7 @@ pub fn insert_row(tx: &Transaction, obj: &ObjMap) -> AppResultU {
 
     let q = format!("INSERT INTO n ({}) VALUES ({})", names, values);
     let args: Vec<&dyn ToSql> = args.iter().map(|it| it as &dyn ToSql).collect();
-    tx.execute(&q, &args)?;
+    tx.execute(&q, &*args)?;
 
     Ok(())
 }
